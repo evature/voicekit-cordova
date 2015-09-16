@@ -1,0 +1,314 @@
+#voice_search_cont {
+	text-align: center;
+	position: fixed;
+	bottom: 0px;
+	width:100%;
+	height:96px;
+	z-index: 1000;
+}
+
+#voice_search_cont > .button {
+	border-radius: 200px;
+	-webkit-touch-callout: none;	
+	-webkit-transition: all .25s ease-in;
+    -moz-transition: all .25s ease-in;
+    -ms-transition: all .25s ease-in;
+    -o-transition: all .25s ease-in;
+    transition: all .25s ease-in;
+}
+
+.record_button {
+	border-radius: 200px;
+	position: relative;
+	width: 76px;
+	height: 76px;
+	background-color: #d44136;
+	background-image: url("../img/eva-microphone_button.png");
+	background-size: 100% 100%;
+	display: inline-block;
+	box-shadow: 0px 4px 5px #444;
+}
+
+.record_button.is_recording {
+	background-color: #e45146;
+	box-shadow: 0px 5px 6px #444;
+	width: 80px;
+	height: 80px;
+}
+
+.record_button.long-pressed {
+	background-image: none;
+	background-color: white; 
+	box-shadow: 0px 0px 44px 34px white;
+	width: 10px;
+	height: 10px;
+	-webkit-transition: none !important;
+    -moz-transition: none !important;
+    -ms-transition: none !important;
+    -o-transition: none !important;
+    transition: none !important;
+    top: 33px;
+}
+
+#voice_search_cont > .trash_button {
+	position:fixed;
+	margin-top:0px;
+	right: 20px;
+	display: none;
+	width: 48px;
+	height: 48px;
+	background-image: url("../img/eva-trash.png");
+	background-size: 100% 100%;
+}
+
+#voice_search_cont > .trash_button.hovered {
+	right: 6px !important;
+	margin-top: -14px !important;
+	width: 76px;
+	height: 76px;
+	box-shadow: 0px 0px 20px white;
+}
+
+#voice_search_cont > .undo_button {
+	position:fixed;
+	margin-top:14px;
+	left: 20px;
+	display: none;
+	width: 48px;
+	height: 48px;
+	background-image: url("../img/eva-undo.png");
+	background-size: 100% 100%;
+}
+
+#voice_search_cont > .undo_button.hovered {
+	left: 6px !important;
+	margin-top: 0px !important;
+	width: 76px;
+	height: 76px;
+	box-shadow: 0px 0px 20px white;
+}
+
+
+.me-chat .eva-error {
+	/*color: red;*/
+	font-style: italic;
+	text-decoration: underline wavy red; /* only works in firefox :( */
+}
+
+.me-chat .eva-time {
+	color: #4CAF50;
+}
+
+.me-chat .eva-location {
+	color: #03A9F4;
+}
+
+.fullscreen {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: none;
+	overflow: auto
+}
+
+#search-results-bg {
+	z-index: 45;
+}
+
+#search-results {
+	z-index: 50;
+}
+
+#cover {
+	background: rgba(0, 0, 0, 0.92);
+	z-index: 25;
+}
+
+#chat-cont {
+	list-style: none;
+	margin-bottom: 120px;
+	padding: 0px;
+}
+
+#chat-cont > li {
+	margin-top: 14px;
+}
+
+.animBlock {
+  display: inline-block;
+  opacity: 0;
+  filter: alpha(opacity=0);
+  position: relative;
+  -webkit-transition: all .55s ease-in;
+  -moz-transition: all .55s ease-in;
+  -ms-transition: all .55s ease-in;
+  -o-transition: all .55s ease-in;
+  transition: all .55s ease-in;
+}
+.animBlock[data-position="left"] { left: -100%; }
+.animBlock[data-position="right"] { right: -100%; }
+ 
+.animBlock[data-position="left"].viewed {
+  left: 0%;
+  opacity: 1;
+  filter: alpha(opacity=100);
+}
+.animBlock[data-position="right"].viewed {
+  right: 0%;
+  opacity: 1;
+  filter: alpha(opacity=100);
+}
+
+
+.me-chat {
+	text-align: left;
+	margin-left: 26px;
+	margin-right: 26px;
+}
+
+.eva-chat {
+	text-align: right;
+	margin-right: 26px;
+	margin-left: 26px;
+}
+
+
+.right-bubble 
+{
+	position: relative;
+	padding: 15px 10px;
+	display:inline-block;
+	text-align: left;
+	background: #4D56AB;
+	color: #fff;
+	-webkit-border-radius: 5px;
+	-moz-border-radius: 5px;
+	border-radius: 5px;
+	border: #1A2152 solid 2px;
+}
+
+.right-bubble:after 
+ {
+	content: '';
+	position: absolute;
+	border-style: solid;
+	border-width: 10px 0 10px 20px;
+	border-color: transparent #4D56AB;
+	display: block;
+	width: 0;
+	z-index: 1;
+	right: -20px;
+	top: 15px;
+}
+
+.right-bubble:before {
+	content: '';
+	position: absolute;
+	border-style: solid;
+	border-width: 11px 0 11px 21px;
+	border-color: transparent #1A2152;
+	display: block;
+	width: 0;
+	z-index: 0;
+	right: -23px;
+	top: 14px;
+}
+
+
+
+.left-bubble 
+{
+	position: relative;
+	padding: 15px;
+	text-align: left;
+	display:inline-block;
+	color: #444;
+	background: #FFFFFF;
+	-webkit-border-radius: 5px;
+	-moz-border-radius: 5px;
+	border-radius: 5px;
+	border: #6D706F solid 2px;
+}
+
+.left-bubble:after 
+{
+    content: '';
+	position: absolute;
+	border-style: solid;
+	border-width: 10px 20px 10px 0;
+	border-color: transparent #FFFFFF;
+	display: block;
+	width: 0;
+	z-index: 1;
+	left: -20px;
+	top: 15px;
+}
+
+.left-bubble:before {
+	content: '';
+	position: absolute;
+	border-style: solid;
+	border-width: 11px 21px 11px 0;
+	border-color: transparent #6D706F;
+	display: block;
+	width: 0;
+	z-index: 0;
+	left: -23px;
+	top: 14px;
+}
+
+.slidewell {
+	position:fixed;
+	display:none;
+	width: 50%;
+	left: 50%;
+	bottom: 10px;
+	overflow: hidden;
+	-webkit-user-select: none;
+	background: rgba(30,30,30,0.5);
+}
+
+.slidewell.left {
+	left: 0 !important;
+	-moz-transform: scaleX(-1);
+    -o-transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1);
+    filter: FlipH;
+    -ms-filter: "FlipH";
+}
+
+.slidewell > h2 {
+  background: -moz-linear-gradient(left, #4d4d4d, 0.4, #4d4d4d, 0.5, white, 0.6, #4d4d4d, #4d4d4d); 
+  background: -webkit-gradient(linear,left top,right top,color-stop(0, #4d4d4d),color-stop(0.4, #4d4d4d),color-stop(0.5, white),color-stop(0.6, #4d4d4d),color-stop(1, #4d4d4d)); 
+  
+  -moz-background-clip: text;
+  -webkit-background-clip: text;
+  
+  -moz-text-fill-color: transparent;
+  -webkit-text-fill-color: transparent;
+  
+  -webkit-animation: slidetounlock 5s linear infinite;
+  animation: slidetounlock 5s linear infinite;
+  
+  font-size: 76px;
+  font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+  font-weight: 300;
+  
+  padding: 0;
+  width: 100%;
+  margin: 0;
+  -webkit-text-size-adjust: none;
+}
+
+
+@-webkit-keyframes slidetounlock {
+  0% {
+    background-position: -180px 0;
+  }
+  100%{
+    background-position: 180px 0;
+  }
+}
