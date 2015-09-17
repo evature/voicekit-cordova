@@ -18,7 +18,6 @@
 }
 
 .eva-record_button {
-	border-radius: 200px;
 	position: relative;
 	width: 76px;
 	height: 76px;
@@ -95,8 +94,13 @@
 
 .eva-me-chat .eva-error {
 	/*color: red;*/
-	font-style: italic;
-	text-decoration: underline wavy red; /* only works in firefox :( */
+	/*font-style: italic;*/
+	
+	/*text-decoration: underline wavy red;  -  only works in firefox :(  below is a cross browser wavy line */
+	
+    display: inline-block;
+    position:relative;
+    background: url("../img/eva-err-underline.gif") bottom repeat-x;
 }
 
 .eva-me-chat .eva-time {
@@ -107,27 +111,19 @@
 	color: #03A9F4;
 }
 
-.eva-fullscreen {
-	position: fixed;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	display: none;
-	overflow: auto
-}
 
-#eva-search-results-bg {
-	z-index: 45;
-}
-
-#eva-search-results {
-	z-index: 50;
-}
 
 #eva-cover {
 	background: rgba(0, 0, 0, 0.92);
 	z-index: 25;
+	
+	position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    overflow: auto;
 }
 
 #eva-chat-cont {

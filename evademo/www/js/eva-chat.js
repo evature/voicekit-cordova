@@ -9,7 +9,10 @@
 			Flight: 'Flight',
 			Car: 'Car',
 			Question: 'Question'
-		}
+		};
+	
+	eva.START_NEW_SEARCH_USER_TEXT = "Start new search.";
+	eva.START_NEW_SEARCH_RESPONSE_TEXT = "Starting a new search, how may I help you?";
 		
 	
 	eva.get = function(object, path, defVal) {
@@ -102,21 +105,28 @@
 		$('#eva-chat-cont').empty();
 		eva.prompt = eva.INITIAL_PROMPT	
 		if (!quiet) {
-			addMeChat("Start new search.")
-			addEvaChat("Starting a new search, how may I help you?");
-			speak("Starting a new search, how may I help you?");
+			addMeChat(eva.START_NEW_SEARCH_USER_TEXT)
+			addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
+			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT);
 		}
 		eva.sessionId = "1";
 	}
 	
 	function undoLastUtterance() {
 		stopSearchResults();
-		var $chatItems = $('#chat-cont > li');
+		var $chatItems = $('#eva-chat-cont > li');
 		for (var i= $chatItems.length-1; i>0; i--) {
 			var $chat = $($chatItems[i]);
-			var found = $chat.hasClass('me-chat');
+			var found = $chat.hasClass('eva-me-chat');
 			$chat.slideUp(function(){ $(this).remove() })
 			if (found) {
+				if (i>0) {
+					// check if the previous one is a server chat
+					var $chatPrev = $($chatItems[i-1]);
+					if ($chatPrev.hasClass('eva-server-chat') && $chatPrev.text() != eva.START_NEW_SEARCH_RESPONSE_TEXT) {
+						$chatPrev.slideUp(function(){ $(this).remove() });
+					}
+				}
 				break;
 			}
 		}
@@ -434,13 +444,15 @@
 	}
 
 	function onBackKeyDown(e) {
-		if (eva.recording) {
+		/* Below is needed for recording that is in the background, not the dialog button
+		 * if (eva.recording) {
 			if (!navigator.speechrecognizer || !navigator.speechrecognizer.cancelRecognizer) {
 				console.log("cancelRecognizer not supported");
 			}
 			else {
 				navigator.speechrecognizer.cancelRecognizer();
 			}
+			console.log("back pressed while recording, stopping recording");
 			eva.recording = false;
 			$('.eva-record_button').removeClass('eva-is_recording');
 			if (meChat != null) {
@@ -448,8 +460,9 @@
 				meChat = null;
 			}
 			return false;
-		}
+		}*/
 		if ($('#eva-search-results').is(":visible")) {
+			console.log("back pressed while showing search results, hiding");
 			speechSynthesis.cancel();
 			$('#eva-search-results-bg').hide()
 			$('#eva-search-results').fadeOut();
@@ -457,6 +470,7 @@
 		}
 		
 		if ($('#eva-cover').is(":visible")) {
+			console.log("back pressed while showing chat, hiding");
 			speechSynthesis.cancel();
 			$('#eva-cover').fadeOut(function() {
 				resetSession(true);
@@ -514,16 +528,16 @@
 		$eva_record_button.on('touchstart mousedown', function(e) {
 			console.log("touchstart record_button");
 			$('.eva-show_on_hold').removeClass('eva-hovered');
-//			if ($(this).is($('#voice_search_cont > .record_button'))) {
-//				if (!showTimeout) {
-//					showTimeout = setTimeout(function() {
-//						showTimeout = false;
-//						window.navigator.vibrate(25);
-//						$('.show_on_hold').fadeIn(500);
-//						$('.record_button').addClass('long-pressed');
-//					}, 450)
-//				}
-//			}
+			if ($(this).is($eva_record_button)) {
+				if (!showTimeout) {
+					showTimeout = setTimeout(function() {
+						showTimeout = false;
+						window.navigator.vibrate(25);
+						$('.eva-show_on_hold').fadeIn(500);
+						$eva_record_button.addClass('eva-long-pressed');
+					}, 450)
+				}
+			}
 			return false;
 		});
 		
@@ -532,6 +546,10 @@
 			var translate = 'translateX('+ delta +'px)';
 			var width = $eva_record_button.width();
 			if (Math.abs(delta) > width) {
+				if (showTimeout) {
+					clearTimeout(showTimeout);
+					showTimeout = false;
+				}
 				$('.eva-show_on_hold').fadeIn(500);
 				$eva_record_button.addClass('eva-long-pressed');
 			}
@@ -590,7 +608,10 @@
 				if ($('.eva-undo_button').is(":visible") == false) {
 				    flag = true;
 				    setTimeout(function(){ flag = false; }, 100);
-					if (eva.recording) {
+				    
+				    start_chat();
+					/* Below is needed for recorder that is background thread, not dialog (replace instead of the start_chat above)
+					 * if (eva.recording) {
 						if (!navigator.speechrecognizer || !navigator.speechrecognizer.cancelRecognizer) {
 							console.log("cancelRecognizer not supported");
 						}
@@ -606,7 +627,7 @@
 					}
 					else {
 					    start_chat();
-					}
+					}*/
 				}
 			}
 			

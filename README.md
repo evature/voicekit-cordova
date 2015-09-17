@@ -23,17 +23,17 @@ The major difference from the above steps is that you would not copy-paste the i
 
 1. Add the following snippet to your index.html, just before the closing of `</body>`
 
-        <div id="cover" class="fullscreen"><ul id="chat-cont"></ul></div>
-        <div id="voice_search_cont">
-            <div class="slidewell show_on_hold">
+        <div id="eva-cover" ><ul id="eva-chat-cont"></ul></div>
+        <div id="eva-voice_search_cont">
+            <div class="eva-slidewell eva-show_on_hold">
                 <h2> &#10143; </h2>
             </div>
-            <div class="slidewell left show_on_hold">
+            <div class="eva-slidewell eva-left eva-show_on_hold">
                 <h2> &#10143; </h2>
             </div>
-            <div class="button undo_button show_on_hold"></div>
-            <div class="button record_button"></div>
-            <div class="button trash_button show_on_hold"></div>
+            <div class="eva-button eva-undo_button eva-show_on_hold"></div>
+            <div class="eva-button eva-record_button"></div>
+            <div class="eva-button eva-trash_button eva-show_on_hold"></div>
         </div>
         
 2. Include the js and css files:
@@ -44,6 +44,6 @@ The major difference from the above steps is that you would not copy-paste the i
    At the end of your `<body>` section add:
    
         <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script>
-        <script type="text/javascript" src="js/chat.js"></script>
-        <script type="text/javascript" src="js/eva_app_setup_eva.js"></script>                                                                                
+        <script type="text/javascript" src="js/eva-chat.js"></script>
+        <script type="text/javascript" src="js/eva-app-setup.js"></script>                                                                                
   
