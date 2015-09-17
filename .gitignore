@@ -2,3 +2,4 @@
 .settings/
 */platforms/**
 */plugins/**
+**/eva-app-credentials.js

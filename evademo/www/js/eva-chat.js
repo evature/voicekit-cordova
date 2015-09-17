@@ -39,22 +39,22 @@
 	eva.prompt = eva.INITIAL_PROMPT;
 	eva.sessionId = "1";
 	
-	var hasSearchResults = false;
+//	var hasSearchResults = false;
 
 	function scrollToBottom() {
 		var $ = jQuery;
-		$("#cover").animate({
-			scrollTop: $("#cover")[0].scrollHeight
+		$("#eva-cover").animate({
+			scrollTop: $("#eva-cover")[0].scrollHeight
 		}, 1000);
 	}
 
 	function addMeChat(text) {
-		var $chat = $('<div data-position="left" class="notViewed animBlock left-bubble">'+text.replace("<","&lt;")+"</div>");
-		var $li = $('<li class="me-chat"></li>');
+		var $chat = $('<div data-position="eva-left" class="eva-notViewed eva-animBlock eva-left-bubble">'+text.replace("<","&lt;")+"</div>");
+		var $li = $('<li class="eva-me-chat"></li>');
 		$li.append($chat);
-		$('#chat-cont').append($li);
+		$('#eva-chat-cont').append($li);
 		scrollToBottom();
-		$chat.removeClass('notViewed').addClass('viewed');
+		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
 	}
 
@@ -65,16 +65,16 @@
 			$chat = existing_evachat;
 		}
 		else {
-			$chat = $('<div data-position="right" class="notViewed animBlock right-bubble">'+text.replace("<","&lt;")+"</div>");
-			var $li = $('<li class="eva-chat"></li>');
+			$chat = $('<div data-position="eva-right" class="eva-notViewed eva-animBlock eva-right-bubble">'+text.replace("<","&lt;")+"</div>");
+			var $li = $('<li class="eva-server-chat"></li>');
 			$li.append($chat);
-			$('#chat-cont').append($li);
+			$('#eva-chat-cont').append($li);
 		}
 		if (speakIt) {
 			speak($chat.text());
 		}
 		scrollToBottom();
-		$chat.removeClass('notViewed').addClass('viewed');
+		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
 	}
 
@@ -93,13 +93,13 @@
 		for (var i=0; i<window.frames.length; i++) {
 			window.frames[i].stop();
 		}
-		$('.search-results').hide();
+		$('.eva-search-results').hide();
 	}
 	
 	function resetSession(quiet) {
 		stopSearchResults();
-		hasSearchResults = false;
-		$('#chat-cont').empty();
+//		hasSearchResults = false;
+		$('#eva-chat-cont').empty();
 		eva.prompt = eva.INITIAL_PROMPT	
 		if (!quiet) {
 			addMeChat("Start new search.")
@@ -121,7 +121,7 @@
 			}
 		}
 		searchWithEva([], false, true);
-		if ($('#chat-cont > li').length == 0) {
+		if ($('#eva-chat-cont > li').length == 0) {
 			resetSession();
 		}
 	}
@@ -385,19 +385,19 @@
 			return; // not ready yet
 		}
 		eva.recording = true;
-		if ($('#chat-cont > li').length == 0) {
+		if ($('#eva-chat-cont > li').length == 0) {
 			addEvaChat(eva.INITIAL_PROMPT);
 		}
-		$('#cover').show();
+		$('#eva-cover').show();
 		speechSynthesis.cancel();
-		$('.record_button').addClass('is_recording');
+		$('.eva-record_button').addClass('eva-is_recording');
 		navigator.speechrecognizer.recognize(
 				function(result) { 
 					var texts = result; //result.texts;
 					var isPartial = false; //result.isPartial;
 					if (!isPartial) {
 						eva.recording = false;
-						$('.record_button').removeClass('is_recording');
+						$('.eva-record_button').removeClass('eva-is_recording');
 					}
 					if (texts.length > 0) {
 						if (!meChat) {
@@ -418,7 +418,7 @@
 				}, 
 				function(e) {
 					eva.recording = false;
-					$('.record_button').removeClass('is_recording');
+					$('.eva-record_button').removeClass('eva-is_recording');
 					if (e != 0 ) {
 						// error=0 is user canceled - not really an error
 						console.error("Speech Recognition Error "+e);
@@ -442,23 +442,23 @@
 				navigator.speechrecognizer.cancelRecognizer();
 			}
 			eva.recording = false;
-			$('.record_button').removeClass('is_recording');
+			$('.eva-record_button').removeClass('eva-is_recording');
 			if (meChat != null) {
 				meChat.closest('li').slideUp(function(){ $(this).remove(); })
 				meChat = null;
 			}
 			return false;
 		}
-		if ($('#search-results').is(":visible")) {
+		if ($('#eva-search-results').is(":visible")) {
 			speechSynthesis.cancel();
-			$('#search-results-bg').hide()
-			$('#search-results').fadeOut();
+			$('#eva-search-results-bg').hide()
+			$('#eva-search-results').fadeOut();
 			return false;
 		}
 		
-		if ($('#cover').is(":visible")) {
+		if ($('#eva-cover').is(":visible")) {
 			speechSynthesis.cancel();
-			$('#cover').fadeOut(function() {
+			$('#eva-cover').fadeOut(function() {
 				resetSession(true);
 			});
 			return false;
@@ -499,9 +499,6 @@
 				}
 			}
 			
-			
-			
-			$('#search-results').hide().attr('src', url); // will be shown when url is loaded
 		}
 	}
 
@@ -510,10 +507,13 @@
 		var flag = false;
 		var showTimeout = false;
 		eva.recording = false;
-		$('.record_button').removeClass('is_recording');
-		$('.record_button').on('touchstart mousedown', function(e) {
+		
+		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
+		
+		$eva_record_button.removeClass('eva-is_recording');
+		$eva_record_button.on('touchstart mousedown', function(e) {
 			console.log("touchstart record_button");
-			$('.show_on_hold').removeClass('hovered');
+			$('.eva-show_on_hold').removeClass('eva-hovered');
 //			if ($(this).is($('#voice_search_cont > .record_button'))) {
 //				if (!showTimeout) {
 //					showTimeout = setTimeout(function() {
@@ -527,44 +527,46 @@
 			return false;
 		});
 		
-		$('#voice_search_cont > .record_button').on('touchmove', function(e) {
+		$eva_record_button.on('touchmove', function(e) {
 			var delta = e.originalEvent.touches[0].pageX - $(window).width()/2;
 			var translate = 'translateX('+ delta +'px)';
-			var width = $('#voice_search_cont > .record_button').width();
+			var width = $eva_record_button.width();
 			if (Math.abs(delta) > width) {
-				$('.show_on_hold').fadeIn(500);
-				$('.record_button').addClass('long-pressed');
+				$('.eva-show_on_hold').fadeIn(500);
+				$eva_record_button.addClass('eva-long-pressed');
 			}
-			$('.record_button').css({'transform': translate, '-webkit-transform':translate})
-			if ($('.trash_button').is(":visible") 
-					&& e.originalEvent.touches[0].pageX >  $('.trash_button').position().left-5
-					&& e.originalEvent.touches[0].pageY >  $('.trash_button').position().top-5
+			$eva_record_button.css({'transform': translate, '-webkit-transform':translate});
+			var $trash_button = $('.eva-trash_button');
+			if ($trash_button.is(":visible") 
+					&& e.originalEvent.touches[0].pageX >  $trash_button.position().left-5
+					&& e.originalEvent.touches[0].pageY >  $trash_button.position().top-5
 			) {
-				$('.trash_button').addClass('hovered');
+				$trash_button.addClass('eva-hovered');
 			}
 			else {
-				$('.trash_button').removeClass('hovered');
+				$trash_button.removeClass('eva-hovered');
 			}
 			
-			if ($('.undo_button').is(":visible") 
-					&& e.originalEvent.touches[0].pageX <  $('.undo_button').position().left+$('.undo_button').width()+5
-					&& e.originalEvent.touches[0].pageY >  $('.undo_button').position().top-5
+			var $undo_button = $('.eva-undo_button');
+			if ($undo_button.is(":visible") 
+					&& e.originalEvent.touches[0].pageX <  $undo_button.position().left+$undo_button.width()+5
+					&& e.originalEvent.touches[0].pageY >  $undo_button.position().top-5
 			) {
-				$('.undo_button').addClass('hovered');
+				$undo_button.addClass('eva-hovered');
 			}
 			else {
-				$('.undo_button').removeClass('hovered');
+				$undo_button.removeClass('eva-hovered');
 			}
 			return false;
 		});
 		
 		// to work both mouse and touch - without waiting for click delay
-		$('.record_button').on('touchend mouseup', function(e) {
+		$eva_record_button.on('touchend mouseup', function(e) {
 			console.log("touchend record_button");
-			$('.record_button').removeClass('long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'})
+			$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'})
 			if (!flag) { // ignore quick double taps
-				var hoveringTrash = $('.trash_button').hasClass('hovered');
-				var hoveringUndo = $('.undo_button').hasClass('hovered');
+				var hoveringTrash = $('.eva-trash_button').hasClass('eva-hovered');
+				var hoveringUndo = $('.eva-undo_button').hasClass('eva-hovered');
 				if (hoveringTrash) {
 					window.navigator.vibrate(25);
 					resetSession();
@@ -578,14 +580,14 @@
 					undoLastUtterance();
 				}
 			
-				$('.show_on_hold').removeClass('hovered');
-				$('.show_on_hold').fadeOut(55);
+				$('.eva-show_on_hold').removeClass('eva-hovered');
+				$('.eva-show_on_hold').fadeOut(55);
 				if (showTimeout) {
 					clearTimeout(showTimeout);
 					showTimeout = false;
 				}
 				
-				if ($('.undo_button').is(":visible") == false) {
+				if ($('.eva-undo_button').is(":visible") == false) {
 				    flag = true;
 				    setTimeout(function(){ flag = false; }, 100);
 					if (eva.recording) {
@@ -595,7 +597,7 @@
 						else {
 							navigator.speechrecognizer.cancelRecognizer();
 						}
-						$('.record_button').removeClass('is_recording');
+						$eva_record_button.removeClass('eva-is_recording');
 						if (meChat != null) {
 							meChat.closest('li').slideUp(function(){ $(this).remove(); })
 							meChat = null;
@@ -612,22 +614,23 @@
 			return false
 		});
 		
-		$('#chat-cont').on('click', '.eva-chat', function(e) {
+		$(document).on('backbutton', onBackKeyDown);
+
+		/*$('#eva-chat-cont').on('click', '.eva-chat', function(e) {
 			if (hasSearchResults) {
-				$('#search-results').fadeIn('fast', function() {
-					$('#search-results-bg').show();
+				$('#eva-search-results').fadeIn('fast', function() {
+					$('#eva-search-results-bg').show();
 				})
 			}
 			return false;
-		})
+		});*/
 		
-		$(document).on('backbutton', onBackKeyDown);
 		
-		$('#search-results').load(function(){
+		/*$('#search-results').load(function(){
 			hasSearchResults= true;
 			console.log('loaded the iframe to '+$(this).attr('src'));
 	        $('.search-results').show();
-	    });
+	    });*/
 		
 		navigator.geolocation.getCurrentPosition(
 			function(position) { // on success
