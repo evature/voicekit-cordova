@@ -1,10 +1,61 @@
 
 (function () {
+	"use strict";
+	
 	var $ = jQuery;
 	// window.eva is the namespace for all things global (functions, variables) used by the Eva integration scripts
 	window.eva = window.eva || {};
+	if (!eva.callbacks) {
+		eva.callbacks = {}
+	}
 	
-	eva.FLOW_TYPE = {
+	
+	eva.enums = {
+		FoodType: {
+	        Unknown: "Unknown", // shouldnt get this one
+	
+	        // Religious:
+	        Kosher:"Kosher", GlattKosher: "Glatt Kosher", Muslim: "Muslim", Hindu: "Hindu",
+	        // Vegetarian:
+	        Vegetarian: "Vegetarian", Vegan: "Vegan", IndianVegetarian: "Indian Vegetarian", RawVegetarian: "Raw Vegetarian", 
+	        OrientalVegetarian: "Oriental Vegetarian", LactoOvoVegetarian: "Lacto Ovo Vegetarian",
+	        LactoVegetarian: "Lacto Vegetarian", OvoVegetarian: "Ovo Vegetarian", JainVegetarian: "Jain Vegetarian",
+	        // Medical meals:
+	        Bland: "Bland", Diabetic: "Diabetic", FruitPlatter: "Fruit Platter", GlutenFree: "GlutenFree", 
+	        LowSodium: "Low Sodium", LowCalorie: "Low Calorie", LowFat: "Low Fat", LowFibre: "Low Fibre",
+	        NonCarbohydrate: "Non Carbohydrate", NonLactose: "Non Lactose", SoftFluid: "Soft Fluid", 
+	        SemiFluid: "Semi Fluid", UlcerDiet: "Ulcer Diet", NutFree: "Nut Free", LowPurine: "Low Purine",
+	        LowProtein: "Low Protein", HighFibre: "High Fibre",
+	        // Infant and child:
+	        Baby: "Baby", PostWeaning: "Post Weaning", Child: "Child", // In airline jargon, baby and infant < 2 years. 1 year < Toddler < 3 years.
+	        // Other:
+	        Seafood: "Seafood", Japanese: "Japanese"
+	    },
+	    
+	    SeatType: { Unknown: "Unknown", Window: "Window", Aisle: "Aisle" },
+		SeatClass: { Unknown: "Unknown",
+			First: "First", Business: "Business", Premium: "Premium", Economy: "Economy"
+		},
+		
+		
+		SortEnum: {
+			unknown: "unknown",
+			reviews: "reviews", location: "location", price: "price", price_per_person: "price_per_person", 
+			distance: "distance", rating: "rating", guest_rating: "guest_rating", 
+			stars: "stars", time: "time", total_time: "total_time", duration: "duration", arrival_time: "arrival_time", 
+			departure_time: "departure_time", outbound_arrival_time: "outbound_arrival_time", 
+			outbound_departure_time: "outbound_departure_time", inbound_arrival_time: "inbound_arrival_time", 
+			inbound_departure_time: "inbound_departure_time", airline: "airline", operator: "operator", 
+			cruiseline: "cruiseline", cruiseship: "cruiseship", name: "name", popularity: "popularity", recommendations: "recommendations"
+		},
+
+		SortOrderEnum: {
+			unknown: "unknown",
+			ascending: "ascending", descending: "descending", reverse: "reverse"
+		}
+	};
+	
+	var FLOW_TYPE = {
 			Hotel: 'Hotel',
 			Flight: 'Flight',
 			Car: 'Car',
@@ -15,7 +66,7 @@
 	eva.START_NEW_SEARCH_RESPONSE_TEXT = "Starting a new search, how may I help you?";
 		
 	
-	eva.get = function(object, path, defVal) {
+	var getField = function(object, path, defVal) {
 		var tokens = path.split('.');
 		for (var i=0; i<tokens.length; i++) {
 			object = object[tokens[i]];
@@ -26,14 +77,14 @@
 		return object;
 	}
 	
-	eva.getAirportCode = function (location) {
+	var getAirportCode = function (location) {
 		if (location["All Airports Code"])
 			return location["All Airports Code"];
 			
 		if (location["Airports"]) {
 			return location["Airports"].split(',')[0];
 		}
-		return '';
+		return undefined;
 	}
 
 
@@ -60,20 +111,30 @@
 		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
 	}
+	
+	eva.addMeChat = addMeChat;
 
-	function addEvaChat(text, existing_evachat, speakIt) {
+	function addEvaChat(text, existing_evachat, speak_it, is_html) {
 		var $chat;
 		if (existing_evachat) {
-			existing_evachat.html(text.replace(/<script/gi, '&lt;script'));
 			$chat = existing_evachat;
 		}
 		else {
-			$chat = $('<div data-position="eva-right" class="eva-notViewed eva-animBlock eva-right-bubble">'+text.replace("<","&lt;")+"</div>");
+			$chat = $('<div data-position="eva-right" class="eva-notViewed eva-animBlock eva-right-bubble"></div>');
+		};
+		if (is_html) {
+			$chat.html(text.replace(/<script/gi, '&lt;script')); // allow html tags but not script tags
+		}
+		else {
+			$chat.text(text);
+		}
+		if (!existing_evachat) {
 			var $li = $('<li class="eva-server-chat"></li>');
 			$li.append($chat);
 			$('#eva-chat-cont').append($li);
 		}
-		if (speakIt) {
+
+		if (speak_it) {
 			speak($chat.text());
 		}
 		scrollToBottom();
@@ -92,15 +153,15 @@
 	    speechSynthesis.speak(u)
 	}
 	
-	function stopSearchResults() {
+	/*function stopSearchResults() {
 		for (var i=0; i<window.frames.length; i++) {
 			window.frames[i].stop();
 		}
 		$('.eva-search-results').hide();
-	}
+	}*/
 	
 	function resetSession(quiet) {
-		stopSearchResults();
+//		stopSearchResults();
 //		hasSearchResults = false;
 		$('#eva-chat-cont').empty();
 		eva.prompt = eva.INITIAL_PROMPT	
@@ -113,22 +174,26 @@
 	}
 	
 	function undoLastUtterance() {
-		stopSearchResults();
-		var $chatItems = $('#eva-chat-cont > li');
-		for (var i= $chatItems.length-1; i>0; i--) {
-			var $chat = $($chatItems[i]);
-			var found = $chat.hasClass('eva-me-chat');
-			$chat.slideUp(function(){ $(this).remove() })
+		//stopSearchResults();
+		var $chat_items = $('#eva-chat-cont > li');
+		var items_to_remove = [];
+		for (var i= $chat_items.length-1; i>0; i--) {
+			var $chat = $($chat_items[i]);
+			var found = $chat.hasClass('eva-me-chat') || $chat.text() == eva.START_NEW_SEARCH_RESPONSE_TEXT;
 			if (found) {
 				if (i>0) {
 					// check if the previous one is a server chat
-					var $chatPrev = $($chatItems[i-1]);
-					if ($chatPrev.hasClass('eva-server-chat') && $chatPrev.text() != eva.START_NEW_SEARCH_RESPONSE_TEXT) {
-						$chatPrev.slideUp(function(){ $(this).remove() });
+					var $chat_prev = $($chat_items[i-1]);
+					if ($chat_prev.hasClass('eva-server-chat') && $chat_prev.text() != eva.START_NEW_SEARCH_RESPONSE_TEXT) {
+						items_to_remove.push($chat_prev);
 					}
 				}
 				break;
 			}
+			items_to_remove.push($chat);
+		}
+		for (var i=0; i<items_to_remove.length; i++) {
+			$(items_to_remove[i]).slideUp(function(){ $(this).remove() })
 		}
 		searchWithEva([], false, true);
 		if ($('#eva-chat-cont > li').length == 0) {
@@ -179,207 +244,7 @@
 		$.ajax({
 			url: url,
 			dataType: 'json',
-			success: function(result) {
-				console.log("Eva result is "+JSON.stringify(result, null, 4));
-				var api_reply = result.api_reply;
-				if (user_chat && api_reply && api_reply.ProcessedText) {
-					
-					
-					var spans = [];
-					//user_chat.text(api_reply.ProcessedText);
-					
-					var warnings = api_reply.Warnings || [];	
-					for (var i=0; i< warnings.length; i++) {
-						var warning = warnings[i];
-						var type = warning[0];
-						var text = warning[1];
-						if (type == "Parse Warning") {
-							var data = warning[2];
-							var position = data.position;
-							if (position == -1 || position == undefined) {
-								continue;
-							}
-							var text = data.text;
-							spans.push({
-								position: position,
-								positionEnd: position+text.length,
-								text: "<span class='eva-error'>"+text.replace(/</g, "&lt;")+"</span>"
-							})
-						}
-					}
-					
-					if (api_reply["Last Utterance Parsed Text"]) {
-						var parsedText  = api_reply["Last Utterance Parsed Text"];
-						var times = parsedText["Times"] || [];
-						for (var i=0; i<times.length; i++) {
-							var time = times[i];
-							var position = time.Position;
-							if (position !== undefined && time.Text) {
-								spans.push({
-									position: position,
-									positionEnd: position+time.Text.length,
-									text: "<span class='eva-time'>"+time.Text.replace(/</g, "&lt;")+"</span>"
-								})
-							}
-						}
-						var locations = parsedText["Locations"] || [];
-						for (var i=0; i<locations.length; i++) {
-							var location = locations[i];
-							var position = location.Position;
-							if (position !== undefined && location.Text) {
-								spans.push({
-									position: position,
-									positionEnd: position+location.Text.length,
-									text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
-								})
-							}
-						}						
-						
-					}
-					spans.sort(function(a,b) {
-						return a.position - b.position;
-					})
-					
-					var prevPos = 0;
-					var resultText = '';
-					for (var i=0; i<spans.length; i++) {
-						var span = spans[i];
-						if (span.position > prevPos) {
-							resultText += api_reply.ProcessedText.slice(prevPos, span.position);
-						}
-						resultText += span.text;
-						prevPos = span.positionEnd;
-					}
-					if (prevPos < api_reply.ProcessedText.length) {
-						resultText += api_reply.ProcessedText.slice(prevPos, api_reply.ProcessedText.length);
-					}
-					user_chat.html(resultText);
-				}
-				
-				if (result.session_id != eva.sessionId && eva.sessionId != "1") {
-					// new session was started
-					stopSearchResults();
-					var chats = $('#chat-cont > li');
-					for (var i=0; i<chats.length; i++) {
-						var $chat = $(chats[i]);
-						var $balloon = $chat.find('div'); 
-						if ($balloon.is(user_chat) || $balloon.is(eva_chat)) {
-							continue;
-						}
-						$chat.remove();
-					}
-				}
-				eva.sessionId = result.session_id || "1";
-				
-				if (!api_reply) {
-					return;
-				}
-				if (api_reply["Service Attributes"]) {
-					var tripInfoRequest = (api_reply["Service Attributes"]["Trip Info"]||{})["Request"];
-					if (tripInfoRequest == "Boarding Pass") {
-						if (eva.callbacks && eva.callbacks.navigateApp) {
-							var ok = eva.callbacks.navigateApp("BoardingPass");
-							if (ok) {
-								addEvaChat("Here is your Boarding Pass", eva_chat, true);
-								return;
-							}
-						}
-					}
-					if (tripInfoRequest == "Itinerary") {
-						if (eva.callbacks && eva.callbacks.navigateApp) {
-							var ok = eva.callbacks.navigateApp("Itinerary");
-							if (ok) {
-								addEvaChat("Showing your Itinerary", eva_chat, true);
-								return;
-							}
-						}
-					}
-					if (tripInfoRequest == "Boarding Time") {
-						if (eva.callbacks && eva.callbacks.getBoardingTime) {
-							var d = eva.callbacks.getBoardingTime();
-							addEvaChat("Your boarding time is "+d, eva_chat, true);
-							return;
-						}
-					}
-					if (tripInfoRequest == "Departure Time") {
-						if (eva.callbacks && eva.callbacks.getDepartureTime) {
-							var d = eva.callbacks.getDepartureTime();
-							addEvaChat("Your departure time is "+d, eva_chat, true);
-							return;
-						}
-					}
-					if (tripInfoRequest == "Arrival Time") {
-						if (eva.callbacks && eva.callbacks.getArrivalTime) {
-							var d = eva.callbacks.getArrivalTime();
-							addEvaChat("Your arrival time is "+d, eva_chat, true);
-							return;
-						}
-					}
-					
-					if (tripInfoRequest == "Gate") {
-						if (eva.callbacks && eva.callbacks.getGateNumber) {
-							var gate = eva.callbacks.getGateNumber();
-							addEvaChat("Your gate number is "+gate, eva_chat, true);
-							return;
-						}
-					}
-		        };
-		        
-				if (api_reply.Flow) {
-					var flow = api_reply.Flow;
-					eva.prompt = eva.INITIAL_PROMPT;
-					for (var i=0; i<flow.length; i++) {
-						if (flow[i].Type == eva.FLOW_TYPE.Question) {
-							eva.prompt = flow[i].SayIt;
-							speak(flow[i].SayIt);
-							if (eva_chat) {
-								eva_chat.text(flow[i].SayIt);
-								scrollToBottom();
-							}
-							else {
-								addEvaChat(flow[i].SayIt);
-							}
-							return;
-						}
-					}
-					
-					var indexesToSkip = {};
-					var first = true;
-					for (var i=0; i<flow.length; i++) {
-						if (indexesToSkip[i]) {
-							console.log("Skipping "+i);
-							continue;
-						}
-						if (flow[i].ReturnTrip) {
-							// override SayIt by ReturnTrip SayIt, if it exists
-							flow[i].SayIt = flow[i].ReturnTrip.SayIt;
-							// skip the return segment flow element 
-							console.log("To skip "+flow[i].ReturnTrip.ActionIndex);
-							indexesToSkip[flow[i].ReturnTrip.ActionIndex] = true;
-						}
-
-						var sayIt = flow[i].SayIt;
-						if (i==0) {
-							if (eva_chat) {
-								eva_chat.text(sayIt);
-								scrollToBottom();
-							}
-						}
-						else {
-							addEvaChat(sayIt);
-						}
-						if (first) {
-							speak(sayIt);
-							first = false;
-						}
-					}
-					
-					
-					
-					eva.process_response(api_reply, eva_chat);
-				}
-				
-			},
+			success: function(response) { return processResponse(response, user_chat, eva_chat); },
 			error: function(e) {
 				if (eva_chat)
 					eva_chat.text("There was an error, try again later.");
@@ -388,9 +253,9 @@
 			}
 		})
 	}
-
-	var meChat = null; 
-	function start_chat() {
+	eva.searchWithEva= searchWithEva;
+	
+	function startRecording() {
 		if (!navigator.speechrecognizer) {
 			return; // not ready yet
 		}
@@ -401,6 +266,7 @@
 		$('#eva-cover').show();
 		speechSynthesis.cancel();
 		$('.eva-record_button').addClass('eva-is_recording');
+		var meChat = null; 
 		navigator.speechrecognizer.recognize(
 				function(result) { 
 					var texts = result; //result.texts;
@@ -461,25 +327,23 @@
 			}
 			return false;
 		}*/
-		if ($('#eva-search-results').is(":visible")) {
+		/*if ($('#eva-search-results').is(":visible")) {
 			console.log("back pressed while showing search results, hiding");
 			speechSynthesis.cancel();
 			$('#eva-search-results-bg').hide()
 			$('#eva-search-results').fadeOut();
 			return false;
-		}
+		}*/
 		
 		if ($('#eva-cover').is(":visible")) {
-			console.log("back pressed while showing chat, hiding");
 			speechSynthesis.cancel();
 			$('#eva-cover').fadeOut(function() {
-				resetSession(true);
+				//resetSession(true);
 			});
 			return false;
 		}
 		
-		history.back();
-		return false;
+		return true;
 	}
 
 //	window.onerror = function(message, url, lineNumber) {  
@@ -488,34 +352,365 @@
 //	  return true;
 //	};  
 	
-	eva.process_response = function(api_reply) {
+	var shown_undo_tip = false;
+	
+	
+	function processResponse(result, user_chat, eva_chat) {
+		console.log("Eva result is "+JSON.stringify(result, null, 4));
+		var api_reply = result.api_reply;
+		var has_warnings = false;
 		
-		if (api_reply.Flow) {
-			// Examine flow to decide what kind of search to activate
-			var flows = api_reply.Flow || [];
-			for (var i=0; i<flows.length; i++) {
-				var flow = flows[i];
-				if (flow.Type == eva.FLOW_TYPE.Question) {
-					// don't trigger search if there is a question
-					return;
-				}
-			}
-			for (var i=0; i<flows.length; i++) {
-				var flow = flows[i];
-				var from,to;
-				if (flow.Type == eva.FLOW_TYPE.Flight) {
-					hasFlight = true;
-					if (flow.ReturnTrip) {
+		if (user_chat && api_reply && api_reply.ProcessedText) {
+			
+			// add highlighting for sematic parts and parse-warnings
+			
+			var spans = [];
+			
+			var warnings = api_reply.Warnings || [];	
+			for (var i=0; i< warnings.length; i++) {
+				var warning = warnings[i];
+				var type = warning[0];
+				var text = warning[1];
+				if (type == "Parse Warning") {
+					var data = warning[2];
+					var position = data.position;
+					if (position == -1 || position == undefined) {
+						continue;
 					}
-	                from = flow.RelatedLocations[0];
-	                to = flow.RelatedLocations[1];
-	                isComplete = true; 
+					has_warnings = true;
+					var text = data.text;
+					spans.push({
+						position: position,
+						positionEnd: position+text.length,
+						text: "<span class='eva-error'>"+text.replace(/</g, "&lt;")+"</span>"
+					})
 				}
 			}
 			
+			if (api_reply["Last Utterance Parsed Text"]) {
+				var parsedText  = api_reply["Last Utterance Parsed Text"];
+				var times = parsedText["Times"] || [];
+				for (var i=0; i<times.length; i++) {
+					var time = times[i];
+					var position = time.Position;
+					if (position !== undefined && time.Text) {
+						spans.push({
+							position: position,
+							positionEnd: position+time.Text.length,
+							text: "<span class='eva-time'>"+time.Text.replace(/</g, "&lt;")+"</span>"
+						})
+					}
+				}
+				var locations = parsedText["Locations"] || [];
+				for (var i=0; i<locations.length; i++) {
+					var location = locations[i];
+					var position = location.Position;
+					if (position !== undefined && location.Text) {
+						spans.push({
+							position: position,
+							positionEnd: position+location.Text.length,
+							text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
+						})
+					}
+				}						
+				
+			}
+			spans.sort(function(a,b) {
+				return a.position - b.position;
+			})
+			
+			var prevPos = 0;
+			var resultText = '';
+			for (var i=0; i<spans.length; i++) {
+				var span = spans[i];
+				if (span.position > prevPos) {
+					resultText += api_reply.ProcessedText.slice(prevPos, span.position);
+				}
+				resultText += span.text;
+				prevPos = span.positionEnd;
+			}
+			if (prevPos < api_reply.ProcessedText.length) {
+				resultText += api_reply.ProcessedText.slice(prevPos, api_reply.ProcessedText.length);
+			}
+			user_chat.html(resultText);
+		}
+		
+		if (result.session_id != eva.sessionId && eva.sessionId != "1") {
+			// new session was started
+//				stopSearchResults();
+			var chats = $('#chat-cont > li');
+			for (var i=0; i<chats.length; i++) {
+				var $chat = $(chats[i]);
+				var $balloon = $chat.find('div'); 
+				if ($balloon.is(user_chat) || $balloon.is(eva_chat)) {
+					continue;
+				}
+				$chat.remove();
+			}
+		}
+		eva.sessionId = result.session_id || "1";
+		
+		if (!api_reply) {
+			return;
+		}
+		
+		if (api_reply["Service Attributes"]) {
+			// TODO: handle the service attributes here, temporary until a flow element is generated for them
+			var handled = handleServiceAttributes(api_reply);
+			if (handled) {
+				return;
+			}
+        };
+        
+		if (api_reply.Flow) {
+			
+			processFlow(api_reply, eva_chat);
+			
+			if (has_warnings) {
+				showUndoTip();
+			}
 		}
 	}
+	
+	function showUndoTip() {
+		if (!shown_undo_tip) {
+			shown_undo_tip = true;
+			addEvaChat("<small><em>Drag the microphone button to the left to undo the last utterance.</em></small>", null, false, true);
+		}
+	}
+	
+	function handleServiceAttributes(api_reply) {
+		if (getField(api_reply, "Service Attributes.Call Support")) {
+			if (eva.callbacks && eva.callbacks.navigateApp) {
+				var ok = eva.callbacks.navigateApp("CallSupport");
+				if (ok) {
+					return true;
+				}
+			}
+		}
+		var tripInfoRequest = getField(api_reply, "Service Attributes.Trip Info.Request");
+		
+		if (tripInfoRequest == "Boarding Pass") {
+			if (eva.callbacks && eva.callbacks.navigateApp) {
+				var ok = eva.callbacks.navigateApp("BoardingPass");
+				if (ok) {
+					addEvaChat("Here is your Boarding Pass", eva_chat, true);
+					return true;
+				}
+			}
+		}
+		if (tripInfoRequest == "Itinerary") {
+			if (eva.callbacks && eva.callbacks.navigateApp) {
+				var ok = eva.callbacks.navigateApp("Itinerary");
+				if (ok) {
+					addEvaChat("Showing your Itinerary", eva_chat, true);
+					return true;
+				}
+			}
+		}
+		if (tripInfoRequest == "Boarding Time") {
+			if (eva.callbacks && eva.callbacks.getBoardingTime) {
+				var cbResult = eva.callbacks.getBoardingTime();
+				addEvaChat("Your boarding time is "+cbResult, eva_chat, true);
+				return true;
+			}
+		}
+		if (tripInfoRequest == "Departure Time") {
+			if (eva.callbacks && eva.callbacks.getDepartureTime) {
+				var cbResult = eva.callbacks.getDepartureTime();
+				addEvaChat("Your departure time is "+cbResult, eva_chat, true);
+				return true;
+			}
+		}
+		if (tripInfoRequest == "Arrival Time") {
+			if (eva.callbacks && eva.callbacks.getArrivalTime) {
+				var cbResult = eva.callbacks.getArrivalTime();
+				addEvaChat("Your arrival time is "+cbResult, eva_chat, true);
+				return true;
+			}
+		}
+		
+		if (tripInfoRequest == "Gate") {
+			if (eva.callbacks && eva.callbacks.getGateNumber) {
+				var gate = eva.callbacks.getGateNumber();
+				addEvaChat("Your gate number is "+gate, eva_chat, true);
+				return true;
+			}
+		}
+	}
+	
+	
+	function processFlow(api_reply, eva_chat) {
+		var flows = api_reply.Flow || [];
+		eva.prompt = eva.INITIAL_PROMPT;
+		// if Eva asks a question then ask it
+		for (var i=0; i<flows.length; i++) {
+			if (flows[i].Type == FLOW_TYPE.Question) {
+				eva.prompt = flows[i].SayIt;
+				addEvaChat(flows[i].SayIt, eva_chat, true);
+				return;
+			}
+		}
+		
+		// no questions, handle the flow items - speak statements and trigger search/callbacks 
+		var indexesToSkip = {};
+		for (var i=0; i<flows.length; i++) {
+			if (indexesToSkip[i]) {
+				console.log("Skipping "+i);
+				continue;
+			}
+			var flow = flows[i];
+			if (flow.ReturnTrip) {
+				// override SayIt by ReturnTrip SayIt, if it exists
+				flow.SayIt = flow.ReturnTrip.SayIt;
+				// skip the return segment flow element 
+				console.log("To skip "+flow.ReturnTrip.ActionIndex);
+				indexesToSkip[flow.ReturnTrip.ActionIndex] = true;
+			}
 
+			var sayIt = flow.SayIt;
+			if (i==0) {
+				addEvaChat(sayIt, eva_chat, true);
+			}
+			else {
+				addEvaChat(sayIt);
+			}
+			
+			switch (flow.Type) {
+				case "Statement":
+					switch (flow.StatementType) {
+					case "Understanding":
+					case "Unknown Expression":
+					case "Unsupported":
+						showUndoTip();
+						break;
+					}
+					break;
+				
+				case "Flight":
+					findFlightResults(api_reply, flow);
+					break;
+				case "Car":
+				case "Hotel":
+				case "Explore":
+				case "Train":
+				case "Cruise":
+					// TODO
+					break;
+					
+			}
+		}
+	}
+		
+	function findFlightResults(api_reply, flow) {
+		if (!eva.callbacks.flightSearch) {
+			return "Flight Search is not supported."; // app did not implement the needed callback 
+		}
+		
+		var related_location_idxes = getField(flow, "RelatedLocations", []);
+		var from_location  = getField(api_reply, "Locations", [])[related_location_idxes[0]];
+		var to_location  = getField(api_reply, "Locations", [])[related_location_idxes[1]];
+
+		var from = getField(from_location, "Name", "").replace(/(\(.*\))/, '').trim();
+		var from_code = getAirportCode(from_location);
+		
+		var to = getField(to_location, "Name", "").replace(/(\(.*\))/, '').trim();
+		var to_code = getAirportCode(to_location);
+		
+		
+		var depart_date_min = null;
+	    var depart_date_max = null;
+	    var departure_str = getField(from_location, "Departure.Date", null);
+        if (departure_str != null) {
+        	var time = getField(from_location, "Departure.Time", "");
+			var depart_date = new Date(departure_str+ " "+time);
+			var restriction = getField(from_location, "Departure.Restriction");
+			if (restriction == "no_later") {
+				depart_date_max = depart_date;
+			}
+			else if (restriction == "no_earlier") {
+				depart_date_min = depart_date;
+			}
+			else {
+				depart_date_max = depart_date_min = depart_date;
+			}
+			/*var days_delta = getField(from_location, "Departure.Delta");
+			if (days_delta && days_delta.startsWith('days=+')) {
+				days_delta = parseInt(days_delta.slice(6), 10);
+				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
+			}
+			else {
+				depart_date_max = depart_date_min;
+			}*/
+		}
+        
+		var return_date_min = null;
+	    var return_date_max = null;
+	    var return_str = getField(to_location, "Departure.Date", null);
+        if (return_str != null) {
+        	var time = getField(to_location, "Departure.Time", "");
+			var return_date = new Date(return_str+ " "+time);
+			var restriction = getField(to_location, "Departure.Restriction");
+			if (restriction == "no_later") {
+				return_date_max = depart_date;
+			}
+			else if (restriction == "no_earlier") {
+				return_date_min = depart_date;
+			}
+			else {
+				return_date_max = return_date_min = depart_date;
+			}
+			/*var days_delta = getField(to_location, "Departure.Delta");
+			if (days_delta && days_delta.startsWith('days=+')) {
+				days_delta = parseInt(days_delta.slice(6), 10);
+				return_date_max = new Date(+return_date + 24*3600*1000*days_delta);
+			}
+			else {
+				return_date_max = return_date_min;
+			}*/
+		}
+
+        var sort = getField(api_reply, "Request Attributes.Sort");
+        if (sort) {
+        	var sort_by = null, sort_order=null;        	
+        	if (sort.By) {
+        		sort_by = sort.By.toLowerCase().replace(/ /g, '_');        		
+        	}
+        	if (sort.Order) {
+        		sort_order = sort.Order.toLowerCase().replace(/ /g, '_');
+        	}
+        }
+        var nonstop=null, redeye=null, airlines=null, food=null, seat_type=null, seat_class=null;
+        var flight_attr = api_reply["Flight Attributes"];
+        if (flight_attr) {
+        	redeye = flight_attr.Redeye;
+        	nonstop = flight_attr.Nonstop;
+        	if (flight_attr.Airline) {
+        		airlines = [];
+        		for (var i=0; i<flight_attr.Airline.length; i++) {
+        			airlines.push(flight_attr.Airline[i].IATA);
+        		}
+        	}
+        	if (flight_attr.Food) {
+        		food = flight_attr.Food.replace(/[ \-]/g, '');
+        	}
+        	seat_type = getField(flight_attr, "Seat", null);
+        	seat_class = getField(flight_attr, "Seat Class", null);
+        }
+        var travelers = getField(api_reply, "Travelers", null);
+        
+        eva.callbacks.flightSearch( 
+        		from, from_code,  
+        		to, to_code, 
+				depart_date_min,  depart_date_max,
+                return_date_min,  return_date_max,
+                travelers,
+                nonstop, seat_class,  airlines,
+                redeye,  food, seat_type,
+                sort_by,  sort_order );
+	}
+
+	
 	
 	$(function() {
 		var flag = false;
@@ -609,8 +804,8 @@
 				    flag = true;
 				    setTimeout(function(){ flag = false; }, 100);
 				    
-				    start_chat();
-					/* Below is needed for recorder that is background thread, not dialog (replace instead of the start_chat above)
+				    startRecording();
+					/* Below is needed for recorder that is background thread, not dialog (replace instead of the startRecording above)
 					 * if (eva.recording) {
 						if (!navigator.speechrecognizer || !navigator.speechrecognizer.cancelRecognizer) {
 							console.log("cancelRecognizer not supported");
@@ -626,7 +821,7 @@
 						eva.recording = false;
 					}
 					else {
-					    start_chat();
+					    startRecording();
 					}*/
 				}
 			}
@@ -665,6 +860,6 @@
 			}
 		);
 		
-	})
+	});
 
 })();

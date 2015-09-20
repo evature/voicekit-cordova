@@ -16,15 +16,15 @@
 		};
 	
 	eva.callbacks = {
-		flightSearch: function( origin,  destination, 
+		flightSearch: function( originName, originCode,  destinationName, destinationCode, 
 				 departDateMin,  departDateMax,
                  returnDateMin,  returnDateMax,
                  travelers,
-                 oneWay,  nonstop, seatClass,  airlines,
+                 nonstop, seatClass,  airlines,
                  redeye,  food, seatType,
                  sortBy,  sortOrder ) {
 			
-			console.log("This is where we would search for flights matching the criteria: from "+origin+" to "+destination);
+			console.log("This is where we would search for flights matching the criteria: from "+originName+" to "+destinationName);
 		},
 			
 		//"What is the departure time?"
