@@ -25,13 +25,13 @@
 	/**
 	 * These are the Callbacks the Application implements - Eva will activate them when requested by the user.
 	 * 
-	 *  All the callbacks return the same, it should be one of the following:
+	 *  All the callbacks return the same, the return value should be one of the following:
 	 *
 	 *  		false - remove the "thinking..." chat bubble and take no further action
 	 * 		    true - replace the "thinking..." chat bubble with Eva's reply and speak it
 	 * 			string - html string to be added the Eva's reply
 	 *          eva.AppResult - and object containing display_it, say_it, (can use different strings for display/speak)
-	 *          Promise - can be used for async operations 
+	 *          Promise - can be used for async operations. The promise should resolve to one of the above return values. 
 	 *          
 	 * 			Note: You can choose to close Eva chat and display a different page instead  
 	 */

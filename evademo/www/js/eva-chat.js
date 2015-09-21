@@ -113,7 +113,7 @@
 	}
 
 
-
+	eva.NOT_SUPPORTED_TEXT = "Sorry, this action is not supported yet";
 	eva.INITIAL_PROMPT = "Hello, how can I help you?";
 	var eva_prompt = eva.INITIAL_PROMPT;
 	eva.session_id = "1";
@@ -689,7 +689,7 @@
 
 				case "Navigate":
 					// if not handled then not supported
-					addEvaChat("Sorry, this action is not supported yet", eva_chat, true);
+					addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
 					showUndoTip();
 					eva_chat = null;
 					break;
