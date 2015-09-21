@@ -48,9 +48,7 @@ The major difference from the above steps is that you would not copy-paste the i
         <script type="text/javascript" src="js/eva-chat.js"></script>
         <script type="text/javascript" src="js/eva-app-setup.js"></script>                                                                                
   
-  
- # Applicative Callbacks
- Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback that should be implemented by you, the integrator.
+
  
  ## eva.init
  Before you can start using Eva you need to initialize it: call  `eva.init(site_code, api_key, callback)` with your credentials.
@@ -58,7 +56,13 @@ The major difference from the above steps is that you would not copy-paste the i
     `result.status` =  one of  ['ok', 'warning', 'error']
     `result.message` = description of the error (if status != 'ok')
   If the result is of type `error` (should never happen!) it means the service is currently unavailable - contact info@evature.com for details. If this is the case you can go ahead and hide the record-button since it will not be functional.
+
   
+ # Applicative Callbacks
+ Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback that should be implemented by you, the integrator.
+  
+Note the callback may close Eva chat and display a different page instead, simply hide the div with id `eva-cover`.
+ 
  ## eva.callbacks
  The currently supported callbacks are:
  
@@ -73,15 +77,15 @@ The major difference from the above steps is that you would not copy-paste the i
  But many more callbacks will be added!  Watch this space.
  
 You don't have to implement all callbacks, if you do not Eva will respond ""Sorry, this action is not supported yet".
+To implment a function simply add a function to the `eva.callbacks` object, or completly replace it, for example:
+    
+    eva.callbacks.gate = function() {...}
+    
+or
 
- All callbacks return the same, the return value should be one of the following:
- *          false - remove the "thinking..." chat bubble and take no further action
- *          true - replace the "thinking..." chat bubble with Eva's reply and speak it
- *          string - html string to be added the Eva's reply
- *          eva.AppResult - and object containing display_it, say_it, (can use different strings for display/speak)
- *          Promise - can be used for async operations. The promise should resolve to one of the above return values. 
+    eva.callbacks = { gate: function() {...} }
 
-Note the callback may close Eva chat and display a different page instead, simply hide the div with id `eva-cover`.
+Callbacks return value is described below.
  
 Currently only the `flightSearch` callback has input parameters, they are described below. Only the `origin`, `destination`, `departDate` parameters are mandatory - the rest are optional.
              
@@ -92,23 +96,40 @@ Currently only the `flightSearch` callback has input parameters, they are descri
  
  1.  departDateMin - the earliest  departure date/time requested by the user (possibly null if only an upper limit is requested)
  1.  departDateMax - the latest date/time requested by the user (possibly same as earliest if only a single date is specified, or null if only a lower limit is requested) 
- *              Example:  "fly from NY to LA not sooner than December 15th"  →  departDateMin = Dec 15,  departDateMax = null
- *              Example:                  "... no later than December 15th"  →  departDateMin = null,    departDateMax = Dec 15
- *              Example:                             "... on December 15th"  →  departDateMin = Dec 15,  departDateMax = Dec 15
-          
- *         Note: the Date object passed will have a time of midnight (UTC) AND have an additional 'DATE_ONLY' flag if no time of day is specified.
- *              Example:  "fly from NY to LA on December 15th at 10am"  → departDate = Date object of "Dec 15th 10:00am (local timezone)"
- *              Example:  "fly from NY to LA on December 15th"          → departDate = Date object of "Dec 15th 00:00am (UTC timezone)"
-                                                                       → and also  departDate.DATE_ONLY == true      
- 
- 1.  returnDateMin - same as for the departure date, except that it is possible both returnDateMin and Max are null (if one-way flight is requested)
- 1.  returnDateMax
- 1.  travelers - travelers.Adult = number of adults specified (undefined if not specified). Same for Infant, Child, Elderly (see enums in eva.enums.TravelersType)
- 1.  nonstop - undefined if not specified,  true/false if requested
- 1.  seatClass - array of Economy/Business/etc.. that the user specified. see  eva.enums.SeatClass
- 1.  airlines - array of IATA Airline codes requested by the user 
- 1.  redeye - undefined if not speficied, true/false if requested by the user
- 1.  food - Food type requested by the user (see eva.enums.FoodType)
- 1.  seatType - Window/Aisle or undefined if not specified (see eva.enums.SeatType)
- 1.  sortBy - sorting criteria if specified by the user (see eva.enums.SortEnum)
- 1.  sortOrder - sort order if specified by the user (see eva.enums.SortOrderEnum)
+
+    *              Example:  "fly from NY to LA not sooner than December 15th"  →  departDateMin = Dec 15,  departDateMax = null
+    *              Example:                  "... no later than December 15th"  →  departDateMin = null,    departDateMax = Dec 15
+    *              Example:                             "... on December 15th"  →  departDateMin = Dec 15,  departDateMax = Dec 15
+    *         Note: the Date object passed will have a time of midnight (UTC) AND have an additional 'DATE_ONLY' flag if no time of day is specified.
+    *              Example:  "fly from NY to LA on December 15th at 10am"  → departDate = Date object of "Dec 15th 10:00am (local timezone)"
+    *              Example:  "fly from NY to LA on December 15th"          → departDate = Date object of "Dec 15th 00:00am (UTC timezone)"
+    *                                                                       → and also  departDate.DATE_ONLY == true      
+ 7.  returnDateMin - same as for the departure date, except that it is possible both returnDateMin and Max are null (if one-way flight is requested)
+ 8.  returnDateMax
+ 9.  travelers - travelers.Adult = number of adults specified (undefined if not specified). Same for Infant, Child, Elderly (see enums in eva.enums.TravelersType)
+ 10.  nonstop - undefined if not specified,  true/false if requested
+ 11.  seatClass - array of Economy/Business/etc.. that the user specified. see  eva.enums.SeatClass
+ 12.  airlines - array of IATA Airline codes requested by the user 
+ 13.  redeye - undefined if not speficied, true/false if requested by the user
+ 14.  food - Food type requested by the user (see eva.enums.FoodType)
+ 15.  seatType - Window/Aisle or undefined if not specified (see eva.enums.SeatType)
+ 16.  sortBy - sorting criteria if specified by the user (see eva.enums.SortEnum)
+ 17.  sortOrder - sort order if specified by the user (see eva.enums.SortOrderEnum)
+
+## Callback return value
+
+ All calldbacks return the same, the return value should be one of the following:
+ *          false - remove the "thinking..." chat bubble and take no further action
+ *          true - replace the "thinking..." chat bubble with Eva's reply and speak it
+ *          string - html string to be added the Eva's reply
+ *          eva.AppResult - and object containing display_it, say_it, (can use different strings for display/speak)
+ *          Promise - can be used for async operations. The promise should resolve to one of the above return values. 
+
+For example look at `eva-app-setup.js`, it include placeholder functions for the different callbacks.
+
+1. boardingTime, gate - are examples of returning a simple string result. The text will be appended to Eva's reply and spoken.
+2. departureTime - is an example of returning an html string. It will be appended to Eva's reply and spoken (but only the text content is spoken of course, the markup is not).
+3. arrivalTime - is an example of returning a promise. You can use it to fetch data from database/server asynchronously. In this example a setTimeout is used instead. The resolved result is a string.
+4. boardingPass - is an example of returning an AppResult with one stsring for `sayIt` (in this case empty) and another string for the display (in this case an html table).
+5. itinerary - fades out the Eva overlay div, and presents an alert when the div is hidden. It returns true in order to replace the chat bubble with Eva's default response.
+6. flight search - is an example of returning a Promise which resolves to an AppResult with one string for `sayIt` and another `display_it`.
