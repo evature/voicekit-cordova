@@ -16,7 +16,7 @@ To integrate with Eva follow the steps:
     `<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; connect-src 'self' https://vproxy.evaws.com">`
 5. Download from this repository the files under the `www` folder and place them into your project.
 6. Register to Evature at http://www.evature.com/registration/form to get your `API_KEY` and `SITE_CODE`. Copy paste the values to matching fields in `eva_app_setup.js` file.
-7. The files is `eva_app_setup.js` which includes examples of Applicative Callbacks - you will have to replace them with your own. See the section below about the applicative callbacks for more info.
+7. The file `eva_app_setup.js` includes examples of Applicative Callbacks - you will have to replace them with your own. See the section below about the applicative callbacks for more info.
 
 
 ## Integrating with existing application 
@@ -51,6 +51,7 @@ The major difference from the above steps is that you would not copy-paste the i
 
  
  ## eva.init
+ 
  Before you can start using Eva you need to initialize it: call  `eva.init(site_code, api_key, callback)` with your credentials.
  The callback will receive a parameter result
     `result.status` =  one of  ['ok', 'warning', 'error']
@@ -58,12 +59,14 @@ The major difference from the above steps is that you would not copy-paste the i
   If the result is of type `error` (should never happen!) it means the service is currently unavailable - contact info@evature.com for details. If this is the case you can go ahead and hide the record-button since it will not be functional.
 
   
- # Applicative Callbacks
- Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback that should be implemented by you, the integrator.
+# Applicative Callbacks
+
+Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback that should be implemented by you, the integrator.
   
 Note the callback may close Eva chat and display a different page instead, simply hide the div with id `eva-cover`.
  
- ## eva.callbacks
+## eva.callbacks
+
  The currently supported callbacks are:
  
     1. flightSearch - Activated when the user searches for flights, eg "Flight from NY to LA on Monday"
