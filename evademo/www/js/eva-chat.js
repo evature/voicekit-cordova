@@ -8,7 +8,23 @@
 	if (!eva.callbacks) {
 		eva.callbacks = {}
 	}
+	eva.VERSION = 'android_cordova_1.0';
 	
+	eva.max_matches = eva.max_matches || 4;
+	
+	/***
+	 * Result of an App callback
+	 * @param say_it (optional) - what should be spoken to the user
+	 * @param display_it (optional) - what should be displayed (inside Eva chat bubble) - note can be HTML string or DOM object.
+	 * 					   defaults to the say_it value
+	 * @param result_count (optional) - number of results found 
+	 */
+	eva.AppResult = function(say_it, display_it, safe_html, result_count) {
+		this.say_it = say_it;
+		this.display_it = display_it || say_it;
+		this.safe_html = safe_html;
+		this.result_count = result_count;
+	}
 	
 	eva.enums = {
 		FoodType: {
@@ -52,6 +68,13 @@
 		SortOrderEnum: {
 			unknown: "unknown",
 			ascending: "ascending", descending: "descending", reverse: "reverse"
+		},
+		
+		TravelersType: {
+			Infant: "Infant",
+			Child: "Child",
+			Adult: "Adult",
+			Elderly: "Elderly"
 		}
 	};
 	
@@ -59,7 +82,9 @@
 			Hotel: 'Hotel',
 			Flight: 'Flight',
 			Car: 'Car',
-			Question: 'Question'
+			Question: 'Question',
+			Navigate: 'Navigate',
+			Statement: 'Statement'
 		};
 	
 	eva.START_NEW_SEARCH_USER_TEXT = "Start new search.";
@@ -90,8 +115,8 @@
 
 
 	eva.INITIAL_PROMPT = "Hello, how can I help you?";
-	eva.prompt = eva.INITIAL_PROMPT;
-	eva.sessionId = "1";
+	var eva_prompt = eva.INITIAL_PROMPT;
+	eva.session_id = "1";
 	
 //	var hasSearchResults = false;
 
@@ -112,8 +137,6 @@
 		return $chat;
 	}
 	
-	eva.addMeChat = addMeChat;
-
 	function addEvaChat(text, existing_evachat, speak_it, is_html) {
 		var $chat;
 		if (existing_evachat) {
@@ -135,12 +158,18 @@
 		}
 
 		if (speak_it) {
-			speak($chat.text());
+			if (typeof speak_it === 'string' || speak_it instanceof String) {
+				speak(speak_it);
+			}
+			else {
+				speak($chat.text());
+			}
 		}
 		scrollToBottom();
 		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
 	}
+	
 
 	function speak(text) {
 		speechSynthesis.cancel();
@@ -164,13 +193,13 @@
 //		stopSearchResults();
 //		hasSearchResults = false;
 		$('#eva-chat-cont').empty();
-		eva.prompt = eva.INITIAL_PROMPT	
+		eva_prompt = eva.INITIAL_PROMPT	
 		if (!quiet) {
 			addMeChat(eva.START_NEW_SEARCH_USER_TEXT)
 			addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
 			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT);
 		}
-		eva.sessionId = "1";
+		eva.session_id = "1";
 	}
 	
 	function undoLastUtterance() {
@@ -201,25 +230,80 @@
 		}
 	}
 
+	
+	var SITE_CODE, API_KEY;
+
+	/*****
+	 * Initialize Eva
+	 * @param site_code
+	 * @param api_key
+	 * @param cb - callback with result
+	 * 		result.status =  one of  ['ok', 'warning', 'error']
+	 * 		result.message = description of the error (if status != 'ok') 
+	 */
+	eva.init = function(site_code, api_key, cb) {
+		SITE_CODE = site_code;
+		API_KEY = api_key;
+		if (!cb) {
+			cb = function(result) { 
+				if (result.status == 'error') {
+					console.log(result.message); 
+				} 
+			}
+		}
+		if (!API_KEY || !SITE_CODE) {
+			var message = "No API_KEY!  Register at http://www.evature.com/registration/form and copy-paste it to eva_app_setup.js  - or contact us for help at info@evature.com";
+			alert(message); // this is an integration error, alert the developers
+			cb({ status: 'error', 
+				message: message});
+			return;
+		}
+		// test the credentials and verify service is up
+		// make a request to Eva to verify the apiKey/siteCode are valid
+		var host = eva.host || 'https://vproxy.evaws.com';
+        var url = host+"/v1.0?site_code="+SITE_CODE+"&api_key="+API_KEY;
+        
+		url += '&sdk_version='+eva.VERSION;
+		url += "&android_ver="+encodeURIComponent(getField(window, 'device.version', 'no-version-info'));
+		url += "&device="+encodeURIComponent(getField(window, 'device.model', 'no-model-info'));
+		url += "&uid="+encodeURIComponent(getField(window, 'device.uuid', 'no-uuid'));
+        url += "&verifyCredentials&input_text=!!!hello";
+
+        $.ajax({
+			url: url,
+			dataType: 'json',
+			success: function(response) { 
+				if (response.status) {
+					cb({status:'ok'});
+				}
+				else {
+					cb({status:'error', message: response.message});
+				}
+			},
+			error: function(e, err) {
+				// this could be a temporary connectivity issue, eg. phone user inside an elevator or a tunnel
+				cb({status:'warning', message: err});
+			}
+        });
+	}
+
 	function searchWithEva(texts, user_chat, edit_last) {
-		var site_code = eva.site_code;
-		var api_key = eva.api_key;
-		if (!api_key || !site_code) {
+		if (!API_KEY || !SITE_CODE) {
 			alert("No API_KEY!  Register at http://www.evature.com/registration/form and copy-paste it to eva_app_setup.js  - or contact us for help at info@evature.com");
 			return;
 		}
 		var host = eva.host || 'https://vproxy.evaws.com';
-		var url = host+'/v1.0?api_key='+encodeURIComponent(api_key)+'&site_code='+encodeURIComponent(site_code);
+		var url = host+'/v1.0?api_key='+encodeURIComponent(API_KEY)+'&site_code='+encodeURIComponent(SITE_CODE);
 		if (eva.context) {
 			url += '&context='+encodeURIComponent(eva.context);
 		}
 		if (eva.scope) {
 			url += '&scope='+encodeURIComponent(eva.scope);
 		}
-		url += '&sdk_version=android_cordova_1.0&locale=US&from_speech=true&ffi_statement&ffi_chains';
-		url += "&android_ver="+encodeURIComponent(window.device.version);
-		url += "&device="+encodeURIComponent(window.device.model);
-		url += "&uid="+encodeURIComponent(window.device.uuid);
+		url += '&sdk_version='+eva.VERSION+'&locale=US&from_speech=true&ffi_statement&ffi_chains';
+		url += "&android_ver="+encodeURIComponent(getField(window, 'device.version', 'no-version-info'));
+		url += "&device="+encodeURIComponent(getField(window, 'device.model', 'no-model-info'));
+		url += "&uid="+encodeURIComponent(getField(window, 'device.uuid', 'no-uuid'));
 		url += "&add_text=true"
 		
 		if (eva.location) {
@@ -233,7 +317,7 @@
 				url += '&input_text='+encodeURIComponent(texts[i]);
 			}
 		}
-		url += "&session_id="+eva.sessionId;
+		url += "&session_id="+eva.session_id;
 		
 		var eva_chat;
 		if (!edit_last) {
@@ -253,7 +337,7 @@
 			}
 		})
 	}
-	eva.searchWithEva= searchWithEva;
+
 	
 	function startRecording() {
 		if (!navigator.speechrecognizer) {
@@ -303,8 +387,8 @@
 						meChat.closest('li').slideUp(function(){ $(this).remove(); })
 						meChat = null;
 					}
-				}, 4 /*maxMatches*/, 
-				eva.prompt /*promptString*/ //, 
+				}, eva.max_matches,  
+				eva_prompt  //, 
 				//"en-US" /*language*/
 			);
 	}
@@ -327,13 +411,19 @@
 			}
 			return false;
 		}*/
-		/*if ($('#eva-search-results').is(":visible")) {
+		/* Below is needed if we use iframe to show the search results
+		 * if ($('#eva-search-results').is(":visible")) {
 			console.log("back pressed while showing search results, hiding");
 			speechSynthesis.cancel();
 			$('#eva-search-results-bg').hide()
 			$('#eva-search-results').fadeOut();
 			return false;
 		}*/
+		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
+		if ($eva_record_button.hasClass('eva-long-pressed')) {
+			$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'});
+			return false;
+		}
 		
 		if ($('#eva-cover').is(":visible")) {
 			speechSynthesis.cancel();
@@ -342,9 +432,10 @@
 			});
 			return false;
 		}
-		
 		return true;
 	}
+	
+	
 
 //	window.onerror = function(message, url, lineNumber) {  
 //	  //alert("Error: "+message+"  at line "+lineNumber+"  in url: "+url);
@@ -435,7 +526,7 @@
 			user_chat.html(resultText);
 		}
 		
-		if (result.session_id != eva.sessionId && eva.sessionId != "1") {
+		if (result.session_id != eva.session_id && eva.session_id != "1") {
 			// new session was started
 //				stopSearchResults();
 			var chats = $('#chat-cont > li');
@@ -448,20 +539,12 @@
 				$chat.remove();
 			}
 		}
-		eva.sessionId = result.session_id || "1";
+		eva.session_id = result.session_id || "1";
 		
 		if (!api_reply) {
 			return;
 		}
 		
-		if (api_reply["Service Attributes"]) {
-			// TODO: handle the service attributes here, temporary until a flow element is generated for them
-			var handled = handleServiceAttributes(api_reply);
-			if (handled) {
-				return;
-			}
-        };
-        
 		if (api_reply.Flow) {
 			
 			processFlow(api_reply, eva_chat);
@@ -479,75 +562,67 @@
 		}
 	}
 	
-	function handleServiceAttributes(api_reply) {
-		if (getField(api_reply, "Service Attributes.Call Support")) {
-			if (eva.callbacks && eva.callbacks.navigateApp) {
-				var ok = eva.callbacks.navigateApp("CallSupport");
-				if (ok) {
-					return true;
+	function handleAppResult(result, eva_chat, flow) {
+		if (!result) {
+			return;
+		}
+		if (!flow ) {
+			flow = {SayIt: ''};
+		}
+		if ('function' === typeof result.then) {
+			addEvaChat(flow.SayIt, eva_chat, true);
+			// the result is a promise - wait for result
+			result.then(function success(result) {
+				if (result.display_it) {
+					// note not saying the flow.say_it again because it was already spoken
+					addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, result.say_it, result.safe_html);
 				}
-			}
-		}
-		var tripInfoRequest = getField(api_reply, "Service Attributes.Trip Info.Request");
-		
-		if (tripInfoRequest == "Boarding Pass") {
-			if (eva.callbacks && eva.callbacks.navigateApp) {
-				var ok = eva.callbacks.navigateApp("BoardingPass");
-				if (ok) {
-					addEvaChat("Here is your Boarding Pass", eva_chat, true);
-					return true;
+				if (typeof result === 'string' || result instanceof String) {
+					addEvaChat(flow.SayIt+' '+result, eva_chat, result, true);
 				}
+			}, function err(e) {
+				console.log("There was an error fetching result for "+navigate_dest);
+			});
+		}
+		else {
+			// this is not a promise - show results right away
+			if (result.display_it) {
+				addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, flow.SayIt+' '+ result.say_it, result.safe_html);
+			}
+			if (typeof result === 'string' || result instanceof String) {
+				addEvaChat(flow.SayIt+' '+result, eva_chat, true, true);
 			}
 		}
-		if (tripInfoRequest == "Itinerary") {
-			if (eva.callbacks && eva.callbacks.navigateApp) {
-				var ok = eva.callbacks.navigateApp("Itinerary");
-				if (ok) {
-					addEvaChat("Showing your Itinerary", eva_chat, true);
-					return true;
-				}
-			}
+	}
+	
+	function handleNavigate(api_reply, eva_chat, flow) {
+		var navigate_dest = flow.NavigationDestination.replace(/ /g, '');
+		navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
+		if (eva.callbacks && eva.callbacks[navigate_dest]) {
+			var result = eva.callbacks[navigate_dest]();
+			handleAppResult(result, eva_chat, flow);
+			return true;
 		}
-		if (tripInfoRequest == "Boarding Time") {
-			if (eva.callbacks && eva.callbacks.getBoardingTime) {
-				var cbResult = eva.callbacks.getBoardingTime();
-				addEvaChat("Your boarding time is "+cbResult, eva_chat, true);
-				return true;
-			}
-		}
-		if (tripInfoRequest == "Departure Time") {
-			if (eva.callbacks && eva.callbacks.getDepartureTime) {
-				var cbResult = eva.callbacks.getDepartureTime();
-				addEvaChat("Your departure time is "+cbResult, eva_chat, true);
-				return true;
-			}
-		}
-		if (tripInfoRequest == "Arrival Time") {
-			if (eva.callbacks && eva.callbacks.getArrivalTime) {
-				var cbResult = eva.callbacks.getArrivalTime();
-				addEvaChat("Your arrival time is "+cbResult, eva_chat, true);
-				return true;
-			}
-		}
-		
-		if (tripInfoRequest == "Gate") {
-			if (eva.callbacks && eva.callbacks.getGateNumber) {
-				var gate = eva.callbacks.getGateNumber();
-				addEvaChat("Your gate number is "+gate, eva_chat, true);
-				return true;
-			}
-		}
+		return false;
+
 	}
 	
 	
 	function processFlow(api_reply, eva_chat) {
 		var flows = api_reply.Flow || [];
-		eva.prompt = eva.INITIAL_PROMPT;
-		// if Eva asks a question then ask it
+		eva_prompt = eva.INITIAL_PROMPT;
+		// if Eva asks a question then ask it, if navigate to page then do it
 		for (var i=0; i<flows.length; i++) {
-			if (flows[i].Type == FLOW_TYPE.Question) {
-				eva.prompt = flows[i].SayIt;
-				addEvaChat(flows[i].SayIt, eva_chat, true);
+			var flow = flows[i];
+			if (flow.Type == FLOW_TYPE.Navigate) {
+				var handled = handleNavigate(api_reply, eva_chat, flow);
+				if (handled) {
+					return;
+				}
+			}
+			if (flow.Type == FLOW_TYPE.Question) {
+				eva_prompt = flow.SayIt;
+				addEvaChat(flow.SayIt, eva_chat, true);
 				return;
 			}
 		}
@@ -568,16 +643,12 @@
 				indexesToSkip[flow.ReturnTrip.ActionIndex] = true;
 			}
 
-			var sayIt = flow.SayIt;
-			if (i==0) {
-				addEvaChat(sayIt, eva_chat, true);
-			}
-			else {
-				addEvaChat(sayIt);
-			}
 			
 			switch (flow.Type) {
-				case "Statement":
+				case FLOW_TYPE.Statement:
+					addEvaChat(flow.SayIt, eva_chat, true);
+					eva_chat = null;
+					
 					switch (flow.StatementType) {
 					case "Understanding":
 					case "Unknown Expression":
@@ -588,7 +659,10 @@
 					break;
 				
 				case "Flight":
-					findFlightResults(api_reply, flow);
+					addEvaChat(flow.SayIt, eva_chat, true);
+					eva_chat = null;
+					var result = findFlightResults(api_reply, flow);
+					handleAppResult(result, null, null);
 					break;
 				case "Car":
 				case "Hotel":
@@ -597,9 +671,49 @@
 				case "Cruise":
 					// TODO
 					break;
-					
+
+				case "Navigate":
+					// if not handled then not supported
+					addEvaChat("Sorry, this action is not supported yet", eva_chat);
+					eva_chat = null;
+					break;
+
 			}
 		}
+	}
+	
+	function getDepartDates(from_location) {
+		var depart_date_min = null;
+	    var depart_date_max = null;
+	    var departure_str = getField(from_location, "Departure.Date", null);
+        if (departure_str != null) {
+        	var time = getField(from_location, "Departure.Time");
+        	var depart_date;
+        	if (time) {
+        		depart_date = new Date(departure_str+ " "+time);
+        	}
+        	else {
+        		depart_date = new Date(departure_str);
+        		depart_date.DATE_ONLY = true;
+        	}
+        	
+			var restriction = getField(from_location, "Departure.Restriction");
+			if (restriction == "no_later") {
+				depart_date_max = depart_date;
+			}
+			else if (restriction == "no_earlier") {
+				depart_date_min = depart_date;
+			}
+			else {
+				depart_date_max = depart_date_min = depart_date;
+			}
+			var days_delta = getField(from_location, "Departure.Delta");
+			if (days_delta && days_delta.startsWith('days=+')) {
+				days_delta = parseInt(days_delta.slice(6), 10);
+				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
+			}
+		}
+        return {min: depart_date_min, max: depart_date_max}
 	}
 		
 	function findFlightResults(api_reply, flow) {
@@ -617,58 +731,9 @@
 		var to = getField(to_location, "Name", "").replace(/(\(.*\))/, '').trim();
 		var to_code = getAirportCode(to_location);
 		
+		var depart_date = getDepartDates(from_location);
+		var return_date = getDepartDates(to_location);
 		
-		var depart_date_min = null;
-	    var depart_date_max = null;
-	    var departure_str = getField(from_location, "Departure.Date", null);
-        if (departure_str != null) {
-        	var time = getField(from_location, "Departure.Time", "");
-			var depart_date = new Date(departure_str+ " "+time);
-			var restriction = getField(from_location, "Departure.Restriction");
-			if (restriction == "no_later") {
-				depart_date_max = depart_date;
-			}
-			else if (restriction == "no_earlier") {
-				depart_date_min = depart_date;
-			}
-			else {
-				depart_date_max = depart_date_min = depart_date;
-			}
-			/*var days_delta = getField(from_location, "Departure.Delta");
-			if (days_delta && days_delta.startsWith('days=+')) {
-				days_delta = parseInt(days_delta.slice(6), 10);
-				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
-			}
-			else {
-				depart_date_max = depart_date_min;
-			}*/
-		}
-        
-		var return_date_min = null;
-	    var return_date_max = null;
-	    var return_str = getField(to_location, "Departure.Date", null);
-        if (return_str != null) {
-        	var time = getField(to_location, "Departure.Time", "");
-			var return_date = new Date(return_str+ " "+time);
-			var restriction = getField(to_location, "Departure.Restriction");
-			if (restriction == "no_later") {
-				return_date_max = depart_date;
-			}
-			else if (restriction == "no_earlier") {
-				return_date_min = depart_date;
-			}
-			else {
-				return_date_max = return_date_min = depart_date;
-			}
-			/*var days_delta = getField(to_location, "Departure.Delta");
-			if (days_delta && days_delta.startsWith('days=+')) {
-				days_delta = parseInt(days_delta.slice(6), 10);
-				return_date_max = new Date(+return_date + 24*3600*1000*days_delta);
-			}
-			else {
-				return_date_max = return_date_min;
-			}*/
-		}
 
         var sort = getField(api_reply, "Request Attributes.Sort");
         if (sort) {
@@ -699,15 +764,15 @@
         }
         var travelers = getField(api_reply, "Travelers", null);
         
-        eva.callbacks.flightSearch( 
+        return eva.callbacks.flightSearch( 
         		from, from_code,  
         		to, to_code, 
-				depart_date_min,  depart_date_max,
-                return_date_min,  return_date_max,
+        		depart_date.min,  depart_date.max,
+        		return_date.min,  return_date.max,
                 travelers,
                 nonstop, seat_class,  airlines,
-                redeye,  food, seat_type,
-                sort_by,  sort_order );
+                redeye, food, seat_type,
+                sort_by, sort_order );
 	}
 
 	
@@ -716,7 +781,6 @@
 		var flag = false;
 		var showTimeout = false;
 		eva.recording = false;
-		
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
 		
 		$eva_record_button.removeClass('eva-is_recording');
