@@ -5,10 +5,6 @@
 	var site_code = credentials.site_code; // this is where you put your Site Code 
 	var api_key =  credentials.api_key; // this is where you put your API Key
 
-	//eva.host = 'http://10.0.0.3:8008';
-	eva.host = 'http://192.168.0.104:8008';
-	eva.max_matches = 1;
-
 	eva.init(site_code, api_key, function(result) {
 		console.log("Eva init result ",result);
 		if (result.error) {

@@ -174,6 +174,10 @@
 	function speak(text, flush) {
 		if (flush)
 			speechSynthesis.cancel();
+		
+		if (eva.recording) {
+			return; // don't speak while recording
+		}
 		var u = new SpeechSynthesisUtterance();
 	    u.text = text;
 	    u.lang = "en-US";
@@ -420,6 +424,7 @@
 			$('#eva-search-results').fadeOut();
 			return false;
 		}*/
+		eva.recording = false;
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
 		if ($eva_record_button.hasClass('eva-long-pressed')) {
 			$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'});
