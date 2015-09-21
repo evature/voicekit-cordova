@@ -27,7 +27,17 @@
 	
 	
 	/**
-	 * These are the Callbacks the Application implements - Eva will activate them when requested by the user. 
+	 * These are the Callbacks the Application implements - Eva will activate them when requested by the user.
+	 * 
+	 *  All the callbacks return the same, it should be one of the following:
+	 *
+	 *  		false - remove the "thinking..." chat bubble and take no further action
+	 * 		    true - replace the "thinking..." chat bubble with Eva's reply and speak it
+	 * 			string - html string to be added the Eva's reply
+	 *          eva.AppResult - and object containing display_it, say_it, (can use different strings for display/speak)
+	 *          Promise - can be used for async operations 
+	 *          
+	 * 			Note: You can choose to close Eva chat and display a different page instead  
 	 */
 	eva.callbacks = {
 			
@@ -36,10 +46,9 @@
 			 *  
 			 * 
 			 * Only the [origin, destination, departDate] parameters are mandatory - the rest are optional
-			 *
-			 * @return (optional) either an object of type eva.AppResult or a promise which will pass AppResult when it is complete.
-			 * 			Note: You can choose to close Eva chat and display search results 
 			 *  
+			 * @return - see above
+			 * 
 			 * @param originName - human readable name of the origin location
 			 * @param originCode -  Airport code of the departure airport
 			 * @param destinationName - as above but for the destination location
@@ -80,7 +89,7 @@
 			console.log("This is where we would search for flights matching the criteria: from "+originName+" to "+destinationName);
 			
 			var price = 100+Math.random()*300|0;
-			var say_it = "I found a flight costing "+price+" $"
+			var say_it = "I found a flight costing "+price+" $, Would you like to buy it?"
 			var html = "I found a flight costing <span style='color:yellow'>"+price+"$</span><br>Would you like to buy it?<br><button class='buy'>Buy!</button><br>or <a class='see-more'>see more results</a>";
 			
 			// example returning one value for display and another value for the speaking, in a promise 
@@ -110,7 +119,7 @@
 			return p;
 		},
 		//"What is the boarding time"
-		boardingTime3: function() {
+		boardingTime: function() {
 			return ": "+ new Date(+new Date() + 3600000*(2+Math.random()*4)).toLocaleTimeString("en-us", dateFormatOptions);
 		},
 		// What is my gate number"
@@ -122,7 +131,7 @@
 		boardingPass: function() {
 			// "Show my boarding pass" 
 			console.log("This is where trip details will show");
-			return new eva.AppResult("", "<table style='border:1px solid white'><tr><th>Code</th><th>Name</th></tr><tr><td>ABC</td><td>James Jones</td></tr></table>", true);
+			return new eva.AppResult("", "<table style='border:1px solid white; margin:5px; padding:5px; text-align:center'><tr><th>Code</th><th>Name</th></tr><tr><td>ABC</td><td>James Jones</td></tr></table>", true);
 		},
 		
 		itinerary: function() {
@@ -130,6 +139,8 @@
 			$('#eva-cover').fadeOut(function() {
 				alert("this is where you would show the itinerary");
 			}); 
+			// nothing to add to the default handling - just show&speak the Eva reply
+			return true;
 		}
 	};
 	

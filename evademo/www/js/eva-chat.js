@@ -171,8 +171,9 @@
 	}
 	
 
-	function speak(text) {
-		speechSynthesis.cancel();
+	function speak(text, flush) {
+		if (flush)
+			speechSynthesis.cancel();
 		var u = new SpeechSynthesisUtterance();
 	    u.text = text;
 	    u.lang = "en-US";
@@ -197,7 +198,7 @@
 		if (!quiet) {
 			addMeChat(eva.START_NEW_SEARCH_USER_TEXT)
 			addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
-			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT);
+			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT, true);
 		}
 		eva.session_id = "1";
 	}
@@ -209,6 +210,7 @@
 		for (var i= $chat_items.length-1; i>0; i--) {
 			var $chat = $($chat_items[i]);
 			var found = $chat.hasClass('eva-me-chat') || $chat.text() == eva.START_NEW_SEARCH_RESPONSE_TEXT;
+			items_to_remove.push($chat);
 			if (found) {
 				if (i>0) {
 					// check if the previous one is a server chat
@@ -219,7 +221,6 @@
 				}
 				break;
 			}
-			items_to_remove.push($chat);
 		}
 		for (var i=0; i<items_to_remove.length; i++) {
 			$(items_to_remove[i]).slideUp(function(){ $(this).remove() })
@@ -564,13 +565,18 @@
 	
 	function handleAppResult(result, eva_chat, flow) {
 		if (!result) {
+			if (eva_chat) {
+				eva_chat.closest('li').slideUp(function(){ $(this).remove(); })
+			}
 			return;
 		}
 		if (!flow ) {
 			flow = {SayIt: ''};
 		}
 		if ('function' === typeof result.then) {
-			addEvaChat(flow.SayIt, eva_chat, true);
+			if (flow.SayIt) {
+				addEvaChat(flow.SayIt, eva_chat, true);
+			}
 			// the result is a promise - wait for result
 			result.then(function success(result) {
 				if (result.display_it) {
@@ -587,10 +593,14 @@
 		else {
 			// this is not a promise - show results right away
 			if (result.display_it) {
-				addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, flow.SayIt+' '+ result.say_it, result.safe_html);
+				addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, flow.SayIt+' '+ (result.say_it || result.display_it), result.safe_html);
 			}
-			if (typeof result === 'string' || result instanceof String) {
+			else if (typeof result === 'string' || result instanceof String) {
 				addEvaChat(flow.SayIt+' '+result, eva_chat, true, true);
+			}
+			else {
+				// result is not false, not promise, not AppResult and not string - its just a true value
+				addEvaChat(flow.SayIt, eva_chat, true, true);
 			}
 		}
 	}
@@ -674,7 +684,8 @@
 
 				case "Navigate":
 					// if not handled then not supported
-					addEvaChat("Sorry, this action is not supported yet", eva_chat);
+					addEvaChat("Sorry, this action is not supported yet", eva_chat, true);
+					showUndoTip();
 					eva_chat = null;
 					break;
 
