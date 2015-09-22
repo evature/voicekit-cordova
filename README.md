@@ -1,25 +1,25 @@
 # VoiceKit Cordova
-VoiceKit is Evature voice interface to travel applications, implemented using Apache Cordova
+VoiceKit is the Evature voice interface to travel applications, implemented using Apache Cordova.
 
-To integrate with Eva follow the steps:
+To integrate with Eva follow these steps:
 
 ## Integrating in a new Project
 1. Start a new Cordova project:   `cordova create <app folder>  <namespace> "<app name>"`
-2. Add Android platform:  `cordova platform add android`
+2. Add an Android platform:  `cordova platform add android`
 3. Install the following plugins:
      * cordova plugin add com.manueldeveloper.speech-recognizer --save
      * cordova plugin add org.apache.cordova.device --save
      * cordova plugin add org.apache.cordova.geolocation --save
      * cordova plugin add org.apache.cordova.speech.speechsynthesis --save
      * cordova plugin add org.apache.cordova.vibration --save
-4. Eva requires AJAX access to its server, if you are using _Content-Security-Policy_ Meta tag then you have to update `connect-src` in it - for example, in the `<head>` section update the tag to:
+4. Eva requires AJAX access to its server. If you are using the _Content-Security-Policy_ Meta tag then you have to update `connect-src` in it - for example, in the `<head>` section update the tag to:
     `<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; connect-src 'self' https://vproxy.evaws.com">`
 5. Download from this repository the files under the `www` folder and place them into your project.
-6. Register to Evature at http://www.evature.com/registration/form to get your `API_KEY` and `SITE_CODE`. Copy paste the values to matching fields in `eva_app_setup.js` file.
+6. If you do not already have Eva credentials, register to Evature at http://www.evature.com/registration/form to get your `API_KEY` and `SITE_CODE`. Copy-paste the values to the matching fields in the `eva_app_setup.js` file.
 7. The file `eva_app_setup.js` includes examples of Applicative Callbacks - you will have to replace them with your own. See the section below about the applicative callbacks for more info.
 
 
-## Integrating with existing application 
+## Integrating with an existing application 
 The major difference from the above steps is that you would not copy-paste the index.html file into your app - instead you need to modify your html file in this way:
 
 1. Add the following snippet to your index.html, just before the closing of `</body>`
@@ -55,15 +55,15 @@ The major difference from the above steps is that you would not copy-paste the i
  Before you can start using Eva you need to initialize it: call  `eva.init(site_code, api_key, callback)` with your credentials.
  The callback will receive a parameter result
     `result.status` =  one of  ['ok', 'warning', 'error']
-    `result.message` = description of the error (if status != 'ok')
-  If the result is of type `error` (should never happen!) it means the service is currently unavailable - contact info@evature.com for details. If this is the case you can go ahead and hide the record-button since it will not be functional.
+    `result.message` = a description of the error (if status != 'ok')
+  If the result is of type `error` (this should never happen!) it means the service or the connectivity to it is currently unavailable - contact info@evature.com for details. If this is the case you should hide the record-button since the service might not be operational.
 
   
 # Applicative Callbacks
 
-Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback that should be implemented by you, the integrator.
+Eva handles the dialog with the user up to the point the user requests an applicative action (eg. searching for flights). At this point Eva activates a callback function that should be implemented by you, the integrator.
   
-Note the callback may close Eva chat and display a different page instead, simply hide the div with id `eva-cover`.
+Note that the callback implementation may close the Eva Chat Overlay and display a different page instead: simply hide the div with the id `eva-cover`.
  
 ## eva.callbacks
 
@@ -73,13 +73,13 @@ Note the callback may close Eva chat and display a different page instead, simpl
     2. departureTime - eg. "What is my departure time?"
     3. arrivalTime - eg. "what is my arrival time?"
     4. boardingTime - eg. "what is the boarding time?"
-    5. gate - eg. "What is my gate?"
+    5. gate - eg. "What is my gate number?"
     6. boardingPass - eg. "Show me my boarding pass"
     7. itinerary - eg. "Show me my trip info"
  
- But many more callbacks will be added!  Watch this space.
+ Many more callbacks are in the process of being added!  Watch this space.
  
-You don't have to implement all callbacks, if you do not Eva will respond ""Sorry, this action is not supported yet".
+You do not have to implement all the callbacks. If you do not implement a specific end-user requested functionality Eva will respond with ""Sorry, this action is not supported yet".
 To implment a function simply add a function to the `eva.callbacks` object, or completly replace it, for example:
     
     eva.callbacks.gate = function() {...}
@@ -88,17 +88,17 @@ or
 
     eva.callbacks = { gate: function() {...} }
 
-Callbacks return value is described below.
+The Callbacks' return value is described below.
  
-Currently only the `flightSearch` callback has input parameters, they are described below. Only the `origin`, `destination`, `departDate` parameters are mandatory - the rest are optional.
+Currently only the `flightSearch` callback has input parameters and they are described below. Only the `origin`, `destination`, `departDate` parameters are mandatory - the rest are optional.
              
  1.  originName - human readable name of the origin location
  1.  originCode -  Airport code of the departure airport
  1.  destinationName - as above but for the destination location
- 1.  destinationCode
+ 1.  destinationCode - as above but for the destination location
  
- 1.  departDateMin - the earliest  departure date/time requested by the user (possibly null if only an upper limit is requested)
- 1.  departDateMax - the latest date/time requested by the user (possibly same as earliest if only a single date is specified, or null if only a lower limit is requested) 
+ 1.  departDateMin - the earliest departure date/time requested by the user (possibly null if only an upper limit is requested)
+ 1.  departDateMax - the latest date/time requested by the user (possibly identical to departDateMin if only a single date/time is specified, or null if only a lower limit is requested) 
 
     *              Example:  "fly from NY to LA not sooner than December 15th"  →  departDateMin = Dec 15,  departDateMax = null
     *              Example:                  "... no later than December 15th"  →  departDateMin = null,    departDateMax = Dec 15
