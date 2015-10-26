@@ -24,6 +24,7 @@
 		this.display_it = display_it || say_it;
 		this.safe_html = safe_html;
 		this.result_count = result_count;
+		this.append_to_eva_sayit = false; // set to true to append the say_it to Eva's reply (which was already displayed and spoken in case of Promise)
 	}
 	
 	eva.enums = {
@@ -87,9 +88,11 @@
 			Statement: 'Statement'
 		};
 	
+	// when starting a new session show these two chat bubbles (user and Eva)
 	eva.START_NEW_SEARCH_USER_TEXT = "Start new search.";
 	eva.START_NEW_SEARCH_RESPONSE_TEXT = "Starting a new search, how may I help you?";
-		
+	
+	eva.THINKING_TEXT = "Thinking..."; // text in chat bubble while waiting for Eva reply 
 	
 	var getField = function(object, path, defVal) {
 		var tokens = path.split('.');
@@ -128,6 +131,9 @@
 	}
 
 	function addMeChat(text) {
+		if (!text) {
+			return;
+		}
 		var $chat = $('<div data-position="eva-left" class="eva-notViewed eva-animBlock eva-left-bubble">'+text.replace("<","&lt;")+"</div>");
 		var $li = $('<li class="eva-me-chat"></li>');
 		$li.append($chat);
@@ -162,6 +168,7 @@
 				speak(speak_it);
 			}
 			else {
+				// speak_it == true - take the jquery.text() of the displayed text
 				speak($chat.text());
 			}
 		}
@@ -200,7 +207,7 @@
 		$('#eva-chat-cont').empty();
 		eva_prompt = eva.INITIAL_PROMPT	
 		if (!quiet) {
-			addMeChat(eva.START_NEW_SEARCH_USER_TEXT)
+			addMeChat(eva.START_NEW_SEARCH_USER_TEXT);
 			addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
 			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT, true);
 		}
@@ -229,6 +236,7 @@
 		for (var i=0; i<items_to_remove.length; i++) {
 			$(items_to_remove[i]).slideUp(function(){ $(this).remove() })
 		}
+		speak("", true);
 		searchWithEva([], false, true);
 		if ($('#eva-chat-cont > li').length == 0) {
 			resetSession();
@@ -272,7 +280,7 @@
 		url += "&android_ver="+encodeURIComponent(getField(window, 'device.version', 'no-version-info'));
 		url += "&device="+encodeURIComponent(getField(window, 'device.model', 'no-model-info'));
 		url += "&uid="+encodeURIComponent(getField(window, 'device.uuid', 'no-uuid'));
-        url += "&verifyCredentials&input_text=!!!hello";
+        url += "&nolog&input_text=hello";
 
         $.ajax({
 			url: url,
@@ -326,7 +334,7 @@
 		
 		var eva_chat;
 		if (!edit_last) {
-			eva_chat = addEvaChat("Thinking...");
+			eva_chat = addEvaChat(eva.THINKING_TEXT);
 		}
 
 		console.log("Sending to Eva: "+url);
@@ -568,8 +576,19 @@
 		}
 	}
 	
+	function combineSayIt(text1, text2) {
+		text1 = (text1 || '').trim();
+		text2 = (text2 || '').trim();
+		if (/^\w/.test(text2)) {
+			return text1 + ' '+ text2;
+		}
+		// text2 begins with non-alphanumeric (most likely punctuation), so no need for space between texts
+		return text1+text2;
+	}
+	
 	function handleAppResult(result, eva_chat, flow) {
 		if (!result) {
+			// falsy result - hide the "thinking..." chat bubble and thats it
 			if (eva_chat) {
 				eva_chat.closest('li').slideUp(function(){ $(this).remove(); })
 			}
@@ -578,18 +597,25 @@
 		if (!flow ) {
 			flow = {SayIt: ''};
 		}
+		
 		if ('function' === typeof result.then) {
+			// result is a promise - replace "thinking..." with the Eva reply and wait for app result 
 			if (flow.SayIt) {
 				addEvaChat(flow.SayIt, eva_chat, true);
 			}
-			// the result is a promise - wait for result
+			
 			result.then(function success(result) {
 				if (result.display_it) {
 					// note not saying the flow.say_it again because it was already spoken
-					addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, result.say_it, result.safe_html);
+					if (result.append_to_eva_sayit) {
+						addEvaChat(combineSayIt(flow.SayIt, result.display_it), eva_chat, result.say_it, result.safe_html);
+					}
+					else {
+						addEvaChat(result.display_it, eva_chat, result.say_it, result.safe_html);
+					}
 				}
 				if (typeof result === 'string' || result instanceof String) {
-					addEvaChat(flow.SayIt+' '+result, eva_chat, result, true);
+					addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, result, true);
 				}
 			}, function err(e) {
 				console.log("There was an error fetching result for "+navigate_dest);
@@ -598,10 +624,18 @@
 		else {
 			// this is not a promise - show results right away
 			if (result.display_it) {
-				addEvaChat(flow.SayIt+' '+result.display_it, eva_chat, flow.SayIt+' '+ (result.say_it || result.display_it), result.safe_html);
+				if (result.append_to_eva_sayit) {
+					addEvaChat(combineSayIt(flow.SayIt, result.display_it), 
+								eva_chat, 
+								combineSayIt(flow.SayIt, resuresult.say_it || result.display_it), 
+								result.safe_html);
+				}
+				else {
+					addEvaChat(result.display_it, eva_chat, (result.say_it || result.display_it), result.safe_html);
+				}
 			}
 			else if (typeof result === 'string' || result instanceof String) {
-				addEvaChat(flow.SayIt+' '+result, eva_chat, true, true);
+				addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, true, true);
 			}
 			else {
 				// result is not false, not promise, not AppResult and not string - its just a true value
@@ -817,6 +851,10 @@
 		});
 		
 		$eva_record_button.on('touchmove', function(e) {
+			if (!$('#eva-cover').is(":visible")) {
+				$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'})
+				return; // can't move microphone button while not in chat-overlay 
+			}
 			var delta = e.originalEvent.touches[0].pageX - $(window).width()/2;
 			var translate = 'translateX('+ delta +'px)';
 			var width = $eva_record_button.width();
