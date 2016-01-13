@@ -528,8 +528,10 @@ module.exports = {
 		var $li = $('<li class="eva-me-chat"></li>');
 		$li.append($chat);
 		$('#eva-chat-cont').append($li);
-		eva.scrollToBottom();
-		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+		if ($('#eva-chat-cont').length != 0) {
+			eva.scrollToBottom();
+			$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+		}
 		return $chat;
 	},
 	
@@ -562,8 +564,10 @@ module.exports = {
 				eva.speak($chat.text());
 			}
 		}
-		eva.scrollToBottom();
-		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+		if ($('#eva-chat-cont').length != 0) {
+			eva.scrollToBottom();
+			$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+		}
 		return $chat;
 	},
 	
