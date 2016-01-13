@@ -1,9 +1,12 @@
 /*global cordova, module*/
 
-var $ = jQuery;
+var $ = Zepto;
 
 var SITE_CODE = null,
 	API_KEY= null;
+
+
+
 
 
 var getField = function(object, path, defVal) {
@@ -32,7 +35,7 @@ function handleAppResult(result, eva_chat, flow) {
 	if (!result) {
 		// falsy result - hide the "thinking..." chat bubble and thats it
 		if (eva_chat) {
-			eva_chat.closest('li').slideUp(function(){ $(this).remove(); })
+			eva_chat.closest('li').fadeOut(function(){ $(this).remove(); })
 		}
 		return;
 	}
@@ -354,7 +357,7 @@ function processResponse(result, user_chat, eva_chat) {
 		for (var i=0; i<chats.length; i++) {
 			var $chat = $(chats[i]);
 			var $balloon = $chat.find('div'); 
-			if ($balloon.is(user_chat) || $balloon.is(eva_chat)) {
+			if ($balloon[0] == user_chat[0] || $balloon[0] == eva_chat[0]) {
 				continue;
 			}
 			$chat.remove();
@@ -497,10 +500,24 @@ module.exports = {
 //	var hasSearchResults = false;
 
 	scrollToBottom: function() {
-		var $ = jQuery;
-		$("#eva-cover").animate({
-			scrollTop: $("#eva-cover")[0].scrollHeight
-		}, 1000);
+		var $el = $('#eva-cover');
+		var duration = 500;
+	    var el  = $el[0];
+	    var startPosition = el.scrollTop;
+	    var delta = el.scrollHeight - $el.height() - startPosition;
+
+	    var startTime = Date.now();
+
+	    function scroll() {
+	        var fraction = Math.min(1, (Date.now() - startTime) / duration);
+
+	        el.scrollTop = delta * fraction + startPosition;
+
+	        if(fraction < 1) {
+	            setTimeout(scroll, 10);
+	        }
+	    }
+	    scroll();
 	},
 
 	addMeChat: function(text) {
@@ -607,7 +624,7 @@ module.exports = {
 			}
 		}
 		for (var i=0; i<items_to_remove.length; i++) {
-			$(items_to_remove[i]).slideUp(function(){ $(this).remove() })
+			$(items_to_remove[i]).fadeOut(function(){ $(this).remove() })
 		}
 		eva.speak("", true);
 		eva.searchWithEva([], false, true);
@@ -782,7 +799,7 @@ module.exports = {
 						console.error("Speech Recognition Error "+e);
 					}
 					if (meChat != null) {
-						meChat.closest('li').slideUp(function(){ $(this).remove(); })
+						meChat.closest('li').fadeOut(function(){ $(this).remove(); })
 						meChat = null;
 					}
 				}, eva.max_matches,  
@@ -804,7 +821,7 @@ module.exports = {
 			eva.recording = false;
 			$('.eva-record_button').removeClass('eva-is_recording');
 			if (meChat != null) {
-				meChat.closest('li').slideUp(function(){ $(this).remove(); })
+				meChat.closest('li').fadeOut(function(){ $(this).remove(); })
 				meChat = null;
 			}
 			return false;
@@ -852,7 +869,7 @@ module.exports = {
 		$eva_record_button.on('touchstart mousedown', function(e) {
 			console.log("touchstart record_button");
 			$('.eva-show_on_hold').removeClass('eva-hovered');
-			if ($(this).is($eva_record_button)) {
+			if (this == $eva_record_button[0]) {
 				if (!showTimeout) {
 					showTimeout = setTimeout(function() {
 						showTimeout = false;
@@ -870,7 +887,7 @@ module.exports = {
 				$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'})
 				return; // can't move microphone button while not in chat-overlay 
 			}
-			var delta = e.originalEvent.touches[0].pageX - $(window).width()/2;
+			var delta = e.touches[0].pageX - $(window).width()/2;
 			var translate = 'translateX('+ delta +'px)';
 			var width = $eva_record_button.width();
 			if (Math.abs(delta) > width) {
@@ -884,8 +901,8 @@ module.exports = {
 			$eva_record_button.css({'transform': translate, '-webkit-transform':translate});
 			var $trash_button = $('.eva-trash_button');
 			if ($trash_button.is(":visible") 
-					&& e.originalEvent.touches[0].pageX >  $trash_button.position().left-5
-					&& e.originalEvent.touches[0].pageY >  $trash_button.position().top-5
+					&& e.touches[0].pageX >  $trash_button.position().left-5
+					&& e.touches[0].pageY >  $trash_button.position().top-5
 			) {
 				$trash_button.addClass('eva-hovered');
 			}
@@ -895,8 +912,8 @@ module.exports = {
 			
 			var $undo_button = $('.eva-undo_button');
 			if ($undo_button.is(":visible") 
-					&& e.originalEvent.touches[0].pageX <  $undo_button.position().left+$undo_button.width()+5
-					&& e.originalEvent.touches[0].pageY >  $undo_button.position().top-5
+					&& e.touches[0].pageX <  $undo_button.position().left+$undo_button.width()+5
+					&& e.touches[0].pageY >  $undo_button.position().top-5
 			) {
 				$undo_button.addClass('eva-hovered');
 			}
@@ -948,7 +965,7 @@ module.exports = {
 						}
 						$eva_record_button.removeClass('eva-is_recording');
 						if (meChat != null) {
-							meChat.closest('li').slideUp(function(){ $(this).remove(); })
+							meChat.closest('li').fadeOut(function(){ $(this).remove(); })
 							meChat = null;
 						}
 						eva.recording = false;

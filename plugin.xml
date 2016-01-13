@@ -20,7 +20,11 @@
     
     <asset src="www/img" target="img" />
     <asset src="www/css" target="css" />
+    <asset src="www/js/zepto.js" target="js/zepto.js" />
     <asset src="www/js/eva-chat.js" target="js/eva-chat.js" />
+    <js-module src="www/js/zepto.js" name="Zepto">
+	    <clobbers target="eva.Zepto" />
+	</js-module>
     <js-module src="www/js/eva-chat.js" name="eva">
         <clobbers target="eva" />
     </js-module>
