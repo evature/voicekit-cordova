@@ -632,7 +632,7 @@ module.exports = {
 		}
 		eva.speak("", true);
 		eva.searchWithEva([], false, true);
-		if ($('#eva-chat-cont > li').length == 0) {
+		if ($('#eva-chat-cont').length &&  !$('#eva-chat-cont > li').length) {
 			eva.resetSession();
 		}
 	},
