@@ -1,16 +1,408 @@
+/*global cordova, module*/
 
-(function () {
-	"use strict";
-	
-	var $ = jQuery;
-	// window.eva is the namespace for all things global (functions, variables) used by the Eva integration scripts
-	window.eva = window.eva || {};
-	if (!eva.callbacks) {
-		eva.callbacks = {}
+var $ = jQuery;
+
+var SITE_CODE = null,
+	API_KEY= null;
+
+
+var getField = function(object, path, defVal) {
+	var tokens = path.split('.');
+	for (var i=0; i<tokens.length; i++) {
+		object = object[tokens[i]];
+		if (object === undefined) {
+			return defVal;
+		}
 	}
-	eva.VERSION = 'android_cordova_1.0';
+	return object;
+}
+
+var getAirportCode = function (location) {
+	if (location["All Airports Code"])
+		return location["All Airports Code"];
+		
+	if (location["Airports"]) {
+		return location["Airports"].split(',')[0];
+	}
+	return undefined;
+}
+
+
+function handleAppResult(result, eva_chat, flow) {
+	if (!result) {
+		// falsy result - hide the "thinking..." chat bubble and thats it
+		if (eva_chat) {
+			eva_chat.closest('li').slideUp(function(){ $(this).remove(); })
+		}
+		return;
+	}
+	if (!flow ) {
+		flow = {SayIt: ''};
+	}
 	
-	eva.max_matches = eva.max_matches || 4;
+	if ('function' === typeof result.then) {
+		// result is a promise - replace "thinking..." with the Eva reply and wait for app result 
+		if (flow.SayIt) {
+			eva.addEvaChat(flow.SayIt, eva_chat, true);
+		}
+		
+		result.then(function success(result) {
+			if (result.display_it) {
+				// note not saying the flow.say_it again because it was already spoken
+				if (result.append_to_eva_sayit) {
+					eva.addEvaChat(combineSayIt(flow.SayIt, result.display_it), eva_chat, result.say_it, result.safe_html);
+				}
+				else {
+					eva.addEvaChat(result.display_it, eva_chat, result.say_it, result.safe_html);
+				}
+			}
+			if (typeof result === 'string' || result instanceof String) {
+				eva.addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, result, true);
+			}
+		}, function err(e) {
+			console.log("There was an error fetching result for "+navigate_dest);
+		});
+	}
+	else {
+		// this is not a promise - show results right away
+		if (result.display_it) {
+			if (result.append_to_eva_sayit) {
+				eva.addEvaChat(combineSayIt(flow.SayIt, result.display_it), 
+							eva_chat, 
+							combineSayIt(flow.SayIt, resuresult.say_it || result.display_it), 
+							result.safe_html);
+			}
+			else {
+				eva.addEvaChat(result.display_it, eva_chat, (result.say_it || result.display_it), result.safe_html);
+			}
+		}
+		else if (typeof result === 'string' || result instanceof String) {
+			eva.addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, true, true);
+		}
+		else {
+			// result is not false, not promise, not AppResult and not string - its just a true value
+			eva.addEvaChat(flow.SayIt, eva_chat, true, true);
+		}
+	}
+}
+
+var handleNavigate = function(api_reply, eva_chat, flow) {
+	var navigate_dest = flow.NavigationDestination.replace(/ /g, '');
+	navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
+	if (eva.callbacks && eva.callbacks[navigate_dest]) {
+		var result = eva.callbacks[navigate_dest]();
+		handleAppResult(result, eva_chat, flow);
+		return true;
+	}
+	return false;
+}
+
+
+var processFlow = function (api_reply, eva_chat) {
+	var flows = api_reply.Flow || [];
+	eva.eva_prompt = eva.INITIAL_PROMPT;
+	// if Eva asks a question then ask it, if navigate to page then do it
+	for (var i=0; i<flows.length; i++) {
+		var flow = flows[i];
+		if (flow.Type == eva.FLOW_TYPE.Navigate) {
+			var handled = handleNavigate(api_reply, eva_chat, flow);
+			if (handled) {
+				return;
+			}
+		}
+		if (flow.Type == eva.FLOW_TYPE.Question) {
+			eva.eva_prompt = flow.SayIt;
+			eva.addEvaChat(flow.SayIt, eva_chat, true);
+			return;
+		}
+	}
+	
+	// no questions, handle the flow items - speak statements and trigger search/callbacks 
+	var indexesToSkip = {};
+	for (var i=0; i<flows.length; i++) {
+		if (indexesToSkip[i]) {
+			console.log("Skipping "+i);
+			continue;
+		}
+		var flow = flows[i];
+		if (flow.ReturnTrip) {
+			// override SayIt by ReturnTrip SayIt, if it exists
+			flow.SayIt = flow.ReturnTrip.SayIt;
+			// skip the return segment flow element 
+			console.log("To skip "+flow.ReturnTrip.ActionIndex);
+			indexesToSkip[flow.ReturnTrip.ActionIndex] = true;
+		}
+
+		
+		switch (flow.Type) {
+			case eva.FLOW_TYPE.Statement:
+				eva.addEvaChat(flow.SayIt, eva_chat, true);
+				eva_chat = null;
+				
+				switch (flow.StatementType) {
+				case "Understanding":
+				case "Unknown Expression":
+				case "Unsupported":
+					showUndoTip();
+					break;
+				}
+				break;
+			
+			case "Flight":
+				eva.addEvaChat(flow.SayIt, eva_chat, true);
+				eva_chat = null;
+				var result = findFlightResults(api_reply, flow);
+				handleAppResult(result, null, null);
+				break;
+			case "Car":
+			case "Hotel":
+			case "Explore":
+			case "Train":
+			case "Cruise":
+				// TODO
+				break;
+
+			case "Navigate":
+				// if not handled then not supported
+				eva.addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
+				showUndoTip();
+				eva_chat = null;
+				break;
+
+		}
+	}
+}
+
+var getDepartDates = function (from_location) {
+	var depart_date_min = null;
+    var depart_date_max = null;
+    var departure_str = getField(from_location, "Departure.Date", null);
+    if (departure_str != null) {
+    	var time = getField(from_location, "Departure.Time");
+    	var depart_date;
+    	if (time) {
+    		depart_date = new Date(departure_str+ " "+time);
+    	}
+    	else {
+    		depart_date = new Date(departure_str);
+    		depart_date.DATE_ONLY = true;
+    	}
+    	
+		var restriction = getField(from_location, "Departure.Restriction");
+		if (restriction == "no_later") {
+			depart_date_max = depart_date;
+		}
+		else if (restriction == "no_earlier") {
+			depart_date_min = depart_date;
+		}
+		else {
+			depart_date_max = depart_date_min = depart_date;
+		}
+		var days_delta = getField(from_location, "Departure.Delta");
+		if (days_delta && days_delta.startsWith('days=+')) {
+			days_delta = parseInt(days_delta.slice(6), 10);
+			depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
+		}
+	}
+    return {min: depart_date_min, max: depart_date_max}
+};
+	
+var findFlightResults = function findFlightResults(api_reply, flow) {
+	if (!eva.callbacks.flightSearch) {
+		return "Flight Search is not supported."; // app did not implement the needed callback 
+	}
+	
+	var related_location_idxes = getField(flow, "RelatedLocations", []);
+	var from_location  = getField(api_reply, "Locations", [])[related_location_idxes[0]];
+	var to_location  = getField(api_reply, "Locations", [])[related_location_idxes[1]];
+
+	var from = getField(from_location, "Name", "").replace(/(\(.*\))/, '').trim();
+	var from_code = getAirportCode(from_location);
+	
+	var to = getField(to_location, "Name", "").replace(/(\(.*\))/, '').trim();
+	var to_code = getAirportCode(to_location);
+	
+	var depart_date = getDepartDates(from_location);
+	var return_date = getDepartDates(to_location);
+	
+
+    var sort = getField(api_reply, "Request Attributes.Sort");
+    if (sort) {
+    	var sort_by = null, sort_order=null;        	
+    	if (sort.By) {
+    		sort_by = sort.By.toLowerCase().replace(/ /g, '_');        		
+    	}
+    	if (sort.Order) {
+    		sort_order = sort.Order.toLowerCase().replace(/ /g, '_');
+    	}
+    }
+    var nonstop=null, redeye=null, airlines=null, food=null, seat_type=null, seat_class=null;
+    var flight_attr = api_reply["Flight Attributes"];
+    if (flight_attr) {
+    	redeye = flight_attr.Redeye;
+    	nonstop = flight_attr.Nonstop;
+    	if (flight_attr.Airline) {
+    		airlines = [];
+    		for (var i=0; i<flight_attr.Airline.length; i++) {
+    			airlines.push(flight_attr.Airline[i].IATA);
+    		}
+    	}
+    	if (flight_attr.Food) {
+    		food = flight_attr.Food.replace(/[ \-]/g, '');
+    	}
+    	seat_type = getField(flight_attr, "Seat", null);
+    	seat_class = getField(flight_attr, "Seat Class", null);
+    }
+    var travelers = getField(api_reply, "Travelers", null);
+    
+    return eva.callbacks.flightSearch( 
+    		from, from_code,  
+    		to, to_code, 
+    		depart_date.min,  depart_date.max,
+    		return_date.min,  return_date.max,
+            travelers,
+            nonstop, seat_class,  airlines,
+            redeye, food, seat_type,
+            sort_by, sort_order );
+};
+
+
+function processResponse(result, user_chat, eva_chat) {
+	console.log("Eva result is "+JSON.stringify(result, null, 4));
+	var api_reply = result.api_reply;
+	var has_warnings = false;
+	
+	if (user_chat && api_reply && api_reply.ProcessedText) {
+		
+		// add highlighting for sematic parts and parse-warnings
+		
+		var spans = [];
+		
+		var warnings = api_reply.Warnings || [];	
+		for (var i=0; i< warnings.length; i++) {
+			var warning = warnings[i];
+			var type = warning[0];
+			var text = warning[1];
+			if (type == "Parse Warning") {
+				var data = warning[2];
+				var position = data.position;
+				if (position == -1 || position == undefined) {
+					continue;
+				}
+				has_warnings = true;
+				var text = data.text;
+				spans.push({
+					position: position,
+					positionEnd: position+text.length,
+					text: "<span class='eva-error'>"+text.replace(/</g, "&lt;")+"</span>"
+				})
+			}
+		}
+		
+		if (api_reply["Last Utterance Parsed Text"]) {
+			var parsedText  = api_reply["Last Utterance Parsed Text"];
+			var times = parsedText["Times"] || [];
+			for (var i=0; i<times.length; i++) {
+				var time = times[i];
+				var position = time.Position;
+				if (position !== undefined && time.Text) {
+					spans.push({
+						position: position,
+						positionEnd: position+time.Text.length,
+						text: "<span class='eva-time'>"+time.Text.replace(/</g, "&lt;")+"</span>"
+					})
+				}
+			}
+			var locations = parsedText["Locations"] || [];
+			for (var i=0; i<locations.length; i++) {
+				var location = locations[i];
+				var position = location.Position;
+				if (position !== undefined && location.Text) {
+					spans.push({
+						position: position,
+						positionEnd: position+location.Text.length,
+						text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
+					})
+				}
+			}						
+			
+		}
+		spans.sort(function(a,b) {
+			return a.position - b.position;
+		})
+		
+		var prevPos = 0;
+		var resultText = '';
+		for (var i=0; i<spans.length; i++) {
+			var span = spans[i];
+			if (span.position > prevPos) {
+				resultText += api_reply.ProcessedText.slice(prevPos, span.position);
+			}
+			resultText += span.text;
+			prevPos = span.positionEnd;
+		}
+		if (prevPos < api_reply.ProcessedText.length) {
+			resultText += api_reply.ProcessedText.slice(prevPos, api_reply.ProcessedText.length);
+		}
+		user_chat.html(resultText);
+	}
+	
+	if (result.session_id != eva.session_id && eva.session_id != "1") {
+		// new session was started
+//			stopSearchResults();
+		var chats = $('#chat-cont > li');
+		for (var i=0; i<chats.length; i++) {
+			var $chat = $(chats[i]);
+			var $balloon = $chat.find('div'); 
+			if ($balloon.is(user_chat) || $balloon.is(eva_chat)) {
+				continue;
+			}
+			$chat.remove();
+		}
+	}
+	eva.session_id = result.session_id || "1";
+	
+	if (!api_reply) {
+		return;
+	}
+	
+	if (api_reply.Flow) {
+		
+		processFlow(api_reply, eva_chat);
+		
+		if (has_warnings) {
+			showUndoTip();
+		}
+	}
+}
+
+var shown_undo_tip = false;
+
+function showUndoTip() {
+	if (!shown_undo_tip) {
+		shown_undo_tip = true;
+		eva.addEvaChat("<small><em>Drag the microphone button to the left to undo the last utterance.</em></small>", null, false, true);
+	}
+}
+
+function combineSayIt(text1, text2) {
+	text1 = (text1 || '').trim();
+	text2 = (text2 || '').trim();
+	if (/^\w/.test(text2)) {
+		return text1 + ' '+ text2;
+	}
+	// text2 begins with non-alphanumeric (most likely punctuation), so no need for space between texts
+	return text1+text2;
+}
+
+
+//////////////////
+module.exports = {
+
+	callbacks: {},
+	VERSION: 'android_cordova_1.0',
+	
+	max_matches: 4,
 	
 	/***
 	 * Result of an App callback
@@ -19,15 +411,15 @@
 	 * 					   defaults to the say_it value
 	 * @param result_count (optional) - number of results found 
 	 */
-	eva.AppResult = function(say_it, display_it, safe_html, result_count) {
+	AppResult: function(say_it, display_it, safe_html, result_count) {
 		this.say_it = say_it;
 		this.display_it = display_it || say_it;
 		this.safe_html = safe_html;
 		this.result_count = result_count;
 		this.append_to_eva_sayit = false; // set to true to append the say_it to Eva's reply (which was already displayed and spoken in case of Promise)
-	}
+	},
 	
-	eva.enums = {
+	enums: {
 		FoodType: {
 	        Unknown: "Unknown", // shouldnt get this one
 	
@@ -77,60 +469,41 @@
 			Adult: "Adult",
 			Elderly: "Elderly"
 		}
-	};
+	},
 	
-	var FLOW_TYPE = {
+	FLOW_TYPE: {
 			Hotel: 'Hotel',
 			Flight: 'Flight',
 			Car: 'Car',
 			Question: 'Question',
 			Navigate: 'Navigate',
 			Statement: 'Statement'
-		};
+		},
 	
 	// when starting a new session show these two chat bubbles (user and Eva)
-	eva.START_NEW_SEARCH_USER_TEXT = "Start new search.";
-	eva.START_NEW_SEARCH_RESPONSE_TEXT = "Starting a new search, how may I help you?";
+	START_NEW_SEARCH_USER_TEXT: "Start new search.",
+	START_NEW_SEARCH_RESPONSE_TEXT: "Starting a new search, how may I help you?",
 	
-	eva.THINKING_TEXT = "Thinking..."; // text in chat bubble while waiting for Eva reply 
+	THINKING_TEXT: "Thinking...", // text in chat bubble while waiting for Eva reply 
 	
-	var getField = function(object, path, defVal) {
-		var tokens = path.split('.');
-		for (var i=0; i<tokens.length; i++) {
-			object = object[tokens[i]];
-			if (object === undefined) {
-				return defVal;
-			}
-		}
-		return object;
-	}
-	
-	var getAirportCode = function (location) {
-		if (location["All Airports Code"])
-			return location["All Airports Code"];
-			
-		if (location["Airports"]) {
-			return location["Airports"].split(',')[0];
-		}
-		return undefined;
-	}
 
-
-	eva.NOT_SUPPORTED_TEXT = "Sorry, this action is not supported yet";
-	eva.INITIAL_PROMPT = "Hello, how can I help you?";
-	var eva_prompt = eva.INITIAL_PROMPT;
-	eva.session_id = "1";
+	NOT_SUPPORTED_TEXT: "Sorry, this action is not supported yet",
+	INITIAL_PROMPT: "Hello, how can I help you?",
+	eva_prompt: null,
+	
+	session_id: "1",
+	recording: false,
 	
 //	var hasSearchResults = false;
 
-	function scrollToBottom() {
+	scrollToBottom: function() {
 		var $ = jQuery;
 		$("#eva-cover").animate({
 			scrollTop: $("#eva-cover")[0].scrollHeight
 		}, 1000);
-	}
+	},
 
-	function addMeChat(text) {
+	addMeChat: function(text) {
 		if (!text) {
 			return;
 		}
@@ -138,12 +511,12 @@
 		var $li = $('<li class="eva-me-chat"></li>');
 		$li.append($chat);
 		$('#eva-chat-cont').append($li);
-		scrollToBottom();
+		eva.scrollToBottom();
 		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
-	}
+	},
 	
-	function addEvaChat(text, existing_evachat, speak_it, is_html) {
+	addEvaChat: function(text, existing_evachat, speak_it, is_html) {
 		var $chat;
 		if (existing_evachat) {
 			$chat = existing_evachat;
@@ -165,20 +538,20 @@
 
 		if (speak_it) {
 			if (typeof speak_it === 'string' || speak_it instanceof String) {
-				speak(speak_it);
+				eva.speak(speak_it);
 			}
 			else {
 				// speak_it == true - take the jquery.text() of the displayed text
-				speak($chat.text());
+				eva.speak($chat.text());
 			}
 		}
-		scrollToBottom();
+		eva.scrollToBottom();
 		$chat.removeClass('eva-notViewed').addClass('eva-viewed');
 		return $chat;
-	}
+	},
 	
 
-	function speak(text, flush) {
+	speak: function(text, flush) {
 		if (flush)
 			speechSynthesis.cancel();
 		
@@ -192,7 +565,7 @@
 	    u.onend = function() { };
 	    console.log("Speaking: ["+text+"]");
 	    speechSynthesis.speak(u)
-	}
+	},
 	
 	/*function stopSearchResults() {
 		for (var i=0; i<window.frames.length; i++) {
@@ -201,20 +574,20 @@
 		$('.eva-search-results').hide();
 	}*/
 	
-	function resetSession(quiet) {
+	resetSession: function(quiet) {
 //		stopSearchResults();
 //		hasSearchResults = false;
 		$('#eva-chat-cont').empty();
-		eva_prompt = eva.INITIAL_PROMPT	
+		eva.eva_prompt = eva.INITIAL_PROMPT	
 		if (!quiet) {
-			addMeChat(eva.START_NEW_SEARCH_USER_TEXT);
-			addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
-			speak(eva.START_NEW_SEARCH_RESPONSE_TEXT, true);
+			eva.addMeChat(eva.START_NEW_SEARCH_USER_TEXT);
+			eva.addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
+			eva.speak(eva.START_NEW_SEARCH_RESPONSE_TEXT, true);
 		}
 		eva.session_id = "1";
-	}
+	},
 	
-	function undoLastUtterance() {
+	undoLastUtterance: function() {
 		//stopSearchResults();
 		var $chat_items = $('#eva-chat-cont > li');
 		var items_to_remove = [];
@@ -236,16 +609,13 @@
 		for (var i=0; i<items_to_remove.length; i++) {
 			$(items_to_remove[i]).slideUp(function(){ $(this).remove() })
 		}
-		speak("", true);
-		searchWithEva([], false, true);
+		eva.speak("", true);
+		eva.searchWithEva([], false, true);
 		if ($('#eva-chat-cont > li').length == 0) {
-			resetSession();
+			eva.resetSession();
 		}
-	}
-
+	},
 	
-	var SITE_CODE, API_KEY;
-
 	/*****
 	 * Initialize Eva
 	 * @param site_code
@@ -254,7 +624,7 @@
 	 * 		result.status =  one of  ['ok', 'warning', 'error']
 	 * 		result.message = description of the error (if status != 'ok') 
 	 */
-	eva.init = function(site_code, api_key, cb) {
+	init: function(site_code, api_key, cb) {
 		SITE_CODE = site_code;
 		API_KEY = api_key;
 		if (!cb) {
@@ -271,6 +641,20 @@
 				message: message});
 			return;
 		}
+		
+		eva.eva_prompt = eva.INITIAL_PROMPT
+        navigator.geolocation.getCurrentPosition(
+    			function(position) { // on success
+    				var coords = position.coords;
+    				eva.location = coords;
+    				console.log("Got location:  lat="+coords.latitude+', long='+coords.longitude+
+    							' accuracy='+coords.accuracy);  // heading, speed, 	altitude, altitudeAccuracy
+    			},
+    			function(error) { // on error
+    				console.error('Error getting location: '+error.code+'  - '+error.message)
+    			}
+    		);
+        
 		// test the credentials and verify service is up
 		// make a request to Eva to verify the apiKey/siteCode are valid
 		var host = eva.host || 'https://vproxy.evaws.com';
@@ -298,9 +682,10 @@
 				cb({status:'warning', message: err});
 			}
         });
-	}
+        
+	},
 
-	function searchWithEva(texts, user_chat, edit_last) {
+	searchWithEva: function(texts, user_chat, edit_last) {
 		if (!API_KEY || !SITE_CODE) {
 			alert("No API_KEY!  Register at http://www.evature.com/registration/form and copy-paste it to eva_app_setup.js  - or contact us for help at info@evature.com");
 			return;
@@ -334,7 +719,7 @@
 		
 		var eva_chat;
 		if (!edit_last) {
-			eva_chat = addEvaChat(eva.THINKING_TEXT);
+			eva_chat = eva.addEvaChat(eva.THINKING_TEXT);
 		}
 
 		console.log("Sending to Eva: "+url);
@@ -349,16 +734,16 @@
 				alert("Error sending to Eva: "+e);
 			}
 		})
-	}
+	},
 
 	
-	function startRecording() {
+	startRecording: function () {
 		if (!navigator.speechrecognizer) {
 			return; // not ready yet
 		}
 		eva.recording = true;
 		if ($('#eva-chat-cont > li').length == 0) {
-			addEvaChat(eva.INITIAL_PROMPT);
+			eva.addEvaChat(eva.INITIAL_PROMPT);
 		}
 		$('#eva-cover').show();
 		speechSynthesis.cancel();
@@ -374,14 +759,14 @@
 					}
 					if (texts.length > 0) {
 						if (!meChat) {
-							meChat = addMeChat("...");
+							meChat = eva.addMeChat("...");
 						}
 						if (isPartial) {
 							meChat.text(texts[0]+"...");
 						}
 						else {
 							meChat.text(texts[0]);
-							searchWithEva(texts, meChat);
+							eva.searchWithEva(texts, meChat);
 							meChat = null;
 						}
 					}
@@ -401,12 +786,12 @@
 						meChat = null;
 					}
 				}, eva.max_matches,  
-				eva_prompt  //, 
+				eva.eva_prompt || eva.INITIAL_PROMPT  //, 
 				//"en-US" /*language*/
 			);
-	}
+	},
 
-	function onBackKeyDown(e) {
+	onBackKeyDown: function (e) {
 		/* Below is needed for recording that is in the background, not the dialog button
 		 * if (eva.recording) {
 			if (!navigator.speechrecognizer || !navigator.speechrecognizer.cancelRecognizer) {
@@ -442,12 +827,12 @@
 		if ($('#eva-cover').is(":visible")) {
 			speechSynthesis.cancel();
 			$('#eva-cover').fadeOut(function() {
-				//resetSession(true);
+				//eva.resetSession(true);
 			});
 			return false;
 		}
 		return true;
-	}
+	},
 	
 	
 
@@ -457,380 +842,10 @@
 //	  return true;
 //	};  
 	
-	var shown_undo_tip = false;
 	
-	
-	function processResponse(result, user_chat, eva_chat) {
-		console.log("Eva result is "+JSON.stringify(result, null, 4));
-		var api_reply = result.api_reply;
-		var has_warnings = false;
-		
-		if (user_chat && api_reply && api_reply.ProcessedText) {
-			
-			// add highlighting for sematic parts and parse-warnings
-			
-			var spans = [];
-			
-			var warnings = api_reply.Warnings || [];	
-			for (var i=0; i< warnings.length; i++) {
-				var warning = warnings[i];
-				var type = warning[0];
-				var text = warning[1];
-				if (type == "Parse Warning") {
-					var data = warning[2];
-					var position = data.position;
-					if (position == -1 || position == undefined) {
-						continue;
-					}
-					has_warnings = true;
-					var text = data.text;
-					spans.push({
-						position: position,
-						positionEnd: position+text.length,
-						text: "<span class='eva-error'>"+text.replace(/</g, "&lt;")+"</span>"
-					})
-				}
-			}
-			
-			if (api_reply["Last Utterance Parsed Text"]) {
-				var parsedText  = api_reply["Last Utterance Parsed Text"];
-				var times = parsedText["Times"] || [];
-				for (var i=0; i<times.length; i++) {
-					var time = times[i];
-					var position = time.Position;
-					if (position !== undefined && time.Text) {
-						spans.push({
-							position: position,
-							positionEnd: position+time.Text.length,
-							text: "<span class='eva-time'>"+time.Text.replace(/</g, "&lt;")+"</span>"
-						})
-					}
-				}
-				var locations = parsedText["Locations"] || [];
-				for (var i=0; i<locations.length; i++) {
-					var location = locations[i];
-					var position = location.Position;
-					if (position !== undefined && location.Text) {
-						spans.push({
-							position: position,
-							positionEnd: position+location.Text.length,
-							text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
-						})
-					}
-				}						
-				
-			}
-			spans.sort(function(a,b) {
-				return a.position - b.position;
-			})
-			
-			var prevPos = 0;
-			var resultText = '';
-			for (var i=0; i<spans.length; i++) {
-				var span = spans[i];
-				if (span.position > prevPos) {
-					resultText += api_reply.ProcessedText.slice(prevPos, span.position);
-				}
-				resultText += span.text;
-				prevPos = span.positionEnd;
-			}
-			if (prevPos < api_reply.ProcessedText.length) {
-				resultText += api_reply.ProcessedText.slice(prevPos, api_reply.ProcessedText.length);
-			}
-			user_chat.html(resultText);
-		}
-		
-		if (result.session_id != eva.session_id && eva.session_id != "1") {
-			// new session was started
-//				stopSearchResults();
-			var chats = $('#chat-cont > li');
-			for (var i=0; i<chats.length; i++) {
-				var $chat = $(chats[i]);
-				var $balloon = $chat.find('div'); 
-				if ($balloon.is(user_chat) || $balloon.is(eva_chat)) {
-					continue;
-				}
-				$chat.remove();
-			}
-		}
-		eva.session_id = result.session_id || "1";
-		
-		if (!api_reply) {
-			return;
-		}
-		
-		if (api_reply.Flow) {
-			
-			processFlow(api_reply, eva_chat);
-			
-			if (has_warnings) {
-				showUndoTip();
-			}
-		}
-	}
-	
-	function showUndoTip() {
-		if (!shown_undo_tip) {
-			shown_undo_tip = true;
-			addEvaChat("<small><em>Drag the microphone button to the left to undo the last utterance.</em></small>", null, false, true);
-		}
-	}
-	
-	function combineSayIt(text1, text2) {
-		text1 = (text1 || '').trim();
-		text2 = (text2 || '').trim();
-		if (/^\w/.test(text2)) {
-			return text1 + ' '+ text2;
-		}
-		// text2 begins with non-alphanumeric (most likely punctuation), so no need for space between texts
-		return text1+text2;
-	}
-	
-	function handleAppResult(result, eva_chat, flow) {
-		if (!result) {
-			// falsy result - hide the "thinking..." chat bubble and thats it
-			if (eva_chat) {
-				eva_chat.closest('li').slideUp(function(){ $(this).remove(); })
-			}
-			return;
-		}
-		if (!flow ) {
-			flow = {SayIt: ''};
-		}
-		
-		if ('function' === typeof result.then) {
-			// result is a promise - replace "thinking..." with the Eva reply and wait for app result 
-			if (flow.SayIt) {
-				addEvaChat(flow.SayIt, eva_chat, true);
-			}
-			
-			result.then(function success(result) {
-				if (result.display_it) {
-					// note not saying the flow.say_it again because it was already spoken
-					if (result.append_to_eva_sayit) {
-						addEvaChat(combineSayIt(flow.SayIt, result.display_it), eva_chat, result.say_it, result.safe_html);
-					}
-					else {
-						addEvaChat(result.display_it, eva_chat, result.say_it, result.safe_html);
-					}
-				}
-				if (typeof result === 'string' || result instanceof String) {
-					addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, result, true);
-				}
-			}, function err(e) {
-				console.log("There was an error fetching result for "+navigate_dest);
-			});
-		}
-		else {
-			// this is not a promise - show results right away
-			if (result.display_it) {
-				if (result.append_to_eva_sayit) {
-					addEvaChat(combineSayIt(flow.SayIt, result.display_it), 
-								eva_chat, 
-								combineSayIt(flow.SayIt, resuresult.say_it || result.display_it), 
-								result.safe_html);
-				}
-				else {
-					addEvaChat(result.display_it, eva_chat, (result.say_it || result.display_it), result.safe_html);
-				}
-			}
-			else if (typeof result === 'string' || result instanceof String) {
-				addEvaChat(combineSayIt(flow.SayIt, result), eva_chat, true, true);
-			}
-			else {
-				// result is not false, not promise, not AppResult and not string - its just a true value
-				addEvaChat(flow.SayIt, eva_chat, true, true);
-			}
-		}
-	}
-	
-	function handleNavigate(api_reply, eva_chat, flow) {
-		var navigate_dest = flow.NavigationDestination.replace(/ /g, '');
-		navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
-		if (eva.callbacks && eva.callbacks[navigate_dest]) {
-			var result = eva.callbacks[navigate_dest]();
-			handleAppResult(result, eva_chat, flow);
-			return true;
-		}
-		return false;
-
-	}
-	
-	
-	function processFlow(api_reply, eva_chat) {
-		var flows = api_reply.Flow || [];
-		eva_prompt = eva.INITIAL_PROMPT;
-		// if Eva asks a question then ask it, if navigate to page then do it
-		for (var i=0; i<flows.length; i++) {
-			var flow = flows[i];
-			if (flow.Type == FLOW_TYPE.Navigate) {
-				var handled = handleNavigate(api_reply, eva_chat, flow);
-				if (handled) {
-					return;
-				}
-			}
-			if (flow.Type == FLOW_TYPE.Question) {
-				eva_prompt = flow.SayIt;
-				addEvaChat(flow.SayIt, eva_chat, true);
-				return;
-			}
-		}
-		
-		// no questions, handle the flow items - speak statements and trigger search/callbacks 
-		var indexesToSkip = {};
-		for (var i=0; i<flows.length; i++) {
-			if (indexesToSkip[i]) {
-				console.log("Skipping "+i);
-				continue;
-			}
-			var flow = flows[i];
-			if (flow.ReturnTrip) {
-				// override SayIt by ReturnTrip SayIt, if it exists
-				flow.SayIt = flow.ReturnTrip.SayIt;
-				// skip the return segment flow element 
-				console.log("To skip "+flow.ReturnTrip.ActionIndex);
-				indexesToSkip[flow.ReturnTrip.ActionIndex] = true;
-			}
-
-			
-			switch (flow.Type) {
-				case FLOW_TYPE.Statement:
-					addEvaChat(flow.SayIt, eva_chat, true);
-					eva_chat = null;
-					
-					switch (flow.StatementType) {
-					case "Understanding":
-					case "Unknown Expression":
-					case "Unsupported":
-						showUndoTip();
-						break;
-					}
-					break;
-				
-				case "Flight":
-					addEvaChat(flow.SayIt, eva_chat, true);
-					eva_chat = null;
-					var result = findFlightResults(api_reply, flow);
-					handleAppResult(result, null, null);
-					break;
-				case "Car":
-				case "Hotel":
-				case "Explore":
-				case "Train":
-				case "Cruise":
-					// TODO
-					break;
-
-				case "Navigate":
-					// if not handled then not supported
-					addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
-					showUndoTip();
-					eva_chat = null;
-					break;
-
-			}
-		}
-	}
-	
-	function getDepartDates(from_location) {
-		var depart_date_min = null;
-	    var depart_date_max = null;
-	    var departure_str = getField(from_location, "Departure.Date", null);
-        if (departure_str != null) {
-        	var time = getField(from_location, "Departure.Time");
-        	var depart_date;
-        	if (time) {
-        		depart_date = new Date(departure_str+ " "+time);
-        	}
-        	else {
-        		depart_date = new Date(departure_str);
-        		depart_date.DATE_ONLY = true;
-        	}
-        	
-			var restriction = getField(from_location, "Departure.Restriction");
-			if (restriction == "no_later") {
-				depart_date_max = depart_date;
-			}
-			else if (restriction == "no_earlier") {
-				depart_date_min = depart_date;
-			}
-			else {
-				depart_date_max = depart_date_min = depart_date;
-			}
-			var days_delta = getField(from_location, "Departure.Delta");
-			if (days_delta && days_delta.startsWith('days=+')) {
-				days_delta = parseInt(days_delta.slice(6), 10);
-				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
-			}
-		}
-        return {min: depart_date_min, max: depart_date_max}
-	}
-		
-	function findFlightResults(api_reply, flow) {
-		if (!eva.callbacks.flightSearch) {
-			return "Flight Search is not supported."; // app did not implement the needed callback 
-		}
-		
-		var related_location_idxes = getField(flow, "RelatedLocations", []);
-		var from_location  = getField(api_reply, "Locations", [])[related_location_idxes[0]];
-		var to_location  = getField(api_reply, "Locations", [])[related_location_idxes[1]];
-
-		var from = getField(from_location, "Name", "").replace(/(\(.*\))/, '').trim();
-		var from_code = getAirportCode(from_location);
-		
-		var to = getField(to_location, "Name", "").replace(/(\(.*\))/, '').trim();
-		var to_code = getAirportCode(to_location);
-		
-		var depart_date = getDepartDates(from_location);
-		var return_date = getDepartDates(to_location);
-		
-
-        var sort = getField(api_reply, "Request Attributes.Sort");
-        if (sort) {
-        	var sort_by = null, sort_order=null;        	
-        	if (sort.By) {
-        		sort_by = sort.By.toLowerCase().replace(/ /g, '_');        		
-        	}
-        	if (sort.Order) {
-        		sort_order = sort.Order.toLowerCase().replace(/ /g, '_');
-        	}
-        }
-        var nonstop=null, redeye=null, airlines=null, food=null, seat_type=null, seat_class=null;
-        var flight_attr = api_reply["Flight Attributes"];
-        if (flight_attr) {
-        	redeye = flight_attr.Redeye;
-        	nonstop = flight_attr.Nonstop;
-        	if (flight_attr.Airline) {
-        		airlines = [];
-        		for (var i=0; i<flight_attr.Airline.length; i++) {
-        			airlines.push(flight_attr.Airline[i].IATA);
-        		}
-        	}
-        	if (flight_attr.Food) {
-        		food = flight_attr.Food.replace(/[ \-]/g, '');
-        	}
-        	seat_type = getField(flight_attr, "Seat", null);
-        	seat_class = getField(flight_attr, "Seat Class", null);
-        }
-        var travelers = getField(api_reply, "Travelers", null);
-        
-        return eva.callbacks.flightSearch( 
-        		from, from_code,  
-        		to, to_code, 
-        		depart_date.min,  depart_date.max,
-        		return_date.min,  return_date.max,
-                travelers,
-                nonstop, seat_class,  airlines,
-                redeye, food, seat_type,
-                sort_by, sort_order );
-	}
-
-	
-	
-	$(function() {
+	setupUI: function() {
 		var flag = false;
 		var showTimeout = false;
-		eva.recording = false;
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
 		
 		$eva_record_button.removeClass('eva-is_recording');
@@ -900,15 +915,15 @@
 				var hoveringUndo = $('.eva-undo_button').hasClass('eva-hovered');
 				if (hoveringTrash) {
 					window.navigator.vibrate(25);
-					resetSession();
+					eva.resetSession();
 //					var texts = ["Rent a car in JFK on Friday, return it in Washington DC on Monday"];
-//					var chat = addMeChat(texts[0]);
-//					searchWithEva(texts, chat)
+//					var chat = eva.addMeChat(texts[0]);
+//					eva.searchWithEva(texts, chat)
 				}
 				
 				if (hoveringUndo) {
 					window.navigator.vibrate(25);
-					undoLastUtterance();
+					eva.undoLastUtterance();
 				}
 			
 				$('.eva-show_on_hold').removeClass('eva-hovered');
@@ -922,7 +937,7 @@
 				    flag = true;
 				    setTimeout(function(){ flag = false; }, 100);
 				    
-				    startRecording();
+				    eva.startRecording();
 					/* Below is needed for recorder that is background thread, not dialog (replace instead of the startRecording above)
 					 * if (eva.recording) {
 						if (!navigator.speechrecognizer || !navigator.speechrecognizer.cancelRecognizer) {
@@ -939,7 +954,7 @@
 						eva.recording = false;
 					}
 					else {
-					    startRecording();
+					    eva.startRecording();
 					}*/
 				}
 			}
@@ -948,7 +963,7 @@
 			return false
 		});
 		
-		$(document).on('backbutton', onBackKeyDown);
+		$(document).on('backbutton', eva.onBackKeyDown);
 
 		/*$('#eva-chat-cont').on('click', '.eva-chat', function(e) {
 			if (hasSearchResults) {
@@ -966,18 +981,8 @@
 	        $('.search-results').show();
 	    });*/
 		
-		navigator.geolocation.getCurrentPosition(
-			function(position) { // on success
-				var coords = position.coords;
-				eva.location = coords;
-				console.log("Got location:  lat="+coords.latitude+', long='+coords.longitude+
-							' accuracy='+coords.accuracy);  // heading, speed, 	altitude, altitudeAccuracy
-			},
-			function(error) { // on error
-				console.error('Error getting locaiton: '+error.code+'  - '+error.message)
-			}
-		);
 		
-	});
+		
+	}
 
-})();
+}
