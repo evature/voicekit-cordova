@@ -31,9 +31,9 @@ See https://github.com/evature/demo-voicekit-cordova/ for an example of a demo a
 
 If your app supports only certain types of travel queries, set `eva.scope` when you initialize your app according to http://www.evature.com/docs/request.html#scope
 
-## UI setup
+## User Interface setup
 
-Call `eva.setupUI();` after eva.init is successful to setup the UI.
+Call `eva.setupUI();` after eva.init is successful to setup the User Interface.
   
   
 # Applicative Callbacks
