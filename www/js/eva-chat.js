@@ -860,9 +860,26 @@ module.exports = {
 //	};  
 	
 	
-	setupUI: function() {
+	setupUI: function(noAddHtml) {
 		var flag = false;
 		var showTimeout = false;
+		
+		if ($('#eva-cover').length == 0) {
+			$('body').append($('<div id="eva-cover"><ul id="eva-chat-cont"></ul></div>'+
+					'<div id="eva-voice_search_cont">'+
+					'<div class="eva-slidewell eva-show_on_hold">'+
+	                	'<h2> &#10143; </h2>'+
+	                '</div>'+
+	                '<div class="eva-slidewell eva-left eva-show_on_hold">'+
+	                	'<h2> &#10143; </h2>'+
+	                '</div>'+
+	                '<div class="eva-button eva-undo_button eva-show_on_hold"></div>'+
+	                '<div class="eva-button eva-record_button"></div>'+
+	                '<div class="eva-button eva-trash_button eva-show_on_hold"></div>'+
+	                '</div>')
+	        );
+		}
+		
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
 		
 		$eva_record_button.removeClass('eva-is_recording');
@@ -895,7 +912,9 @@ module.exports = {
 					clearTimeout(showTimeout);
 					showTimeout = false;
 				}
-				$('.eva-show_on_hold').fadeIn(500);
+				if ($('.eva-show_on_hold').is(":visible") == false) {
+					$('.eva-show_on_hold').fadeIn(500);
+				}
 				$eva_record_button.addClass('eva-long-pressed');
 			}
 			$eva_record_button.css({'transform': translate, '-webkit-transform':translate});
