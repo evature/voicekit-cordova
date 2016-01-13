@@ -3,61 +3,38 @@ VoiceKit is the Evature voice interface to travel applications, implemented usin
 
 To integrate with Eva follow these steps:
 
-## Integrating in a new Project
+## Using VoiceKit
 1. Start a new Cordova project:   `cordova create <app folder>  <namespace> "<app name>"`
 2. Add an Android platform:  `cordova platform add android`
-3. Install the following plugins:
-     * cordova plugin add com.manueldeveloper.speech-recognizer --save
-     * cordova plugin add org.apache.cordova.device --save
-     * cordova plugin add org.apache.cordova.geolocation --save
-     * cordova plugin add org.apache.cordova.speech.speechsynthesis --save
-     * cordova plugin add org.apache.cordova.vibration --save
+3. Install the following plugin:
+     * cordova plugin add https://github.com/evature/voicekit-cordova.git --save
 4. Eva requires AJAX access to its server. If you are using the _Content-Security-Policy_ Meta tag then you have to update `connect-src` in it - for example, in the `<head>` section update the tag to:
     `<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *; connect-src 'self' https://vproxy.evaws.com">`
-5. Download from this repository the files under the `www` folder and place them into your project.
-6. If you do not already have Eva credentials, register to Evature at http://www.evature.com/registration/form to get your `API_KEY` and `SITE_CODE`. Copy-paste the values to the matching fields in the `eva_app_setup.js` file.
-7. The file `eva_app_setup.js` includes examples of Applicative Callbacks - you will have to replace them with your own. See the section below about the applicative callbacks for more info.
+5. If you do not already have Eva credentials, register to Evature at http://www.evature.com/registration/form to get your `API_KEY` and `SITE_CODE`. 
+6. Follow the steps below. You can take a look at the demo application.
 
-
-## Integrating with an existing application 
-The major difference from the above steps is that you would not copy-paste the index.html file into your app - instead you need to modify your html file in this way:
-
-1. Add the following snippet to your index.html, just before the closing of `</body>`
-
-        <div id="eva-cover" ><ul id="eva-chat-cont"></ul></div>
-        <div id="eva-voice_search_cont">
-            <div class="eva-slidewell eva-show_on_hold">
-                <h2> &#10143; </h2>
-            </div>
-            <div class="eva-slidewell eva-left eva-show_on_hold">
-                <h2> &#10143; </h2>
-            </div>
-            <div class="eva-button eva-undo_button eva-show_on_hold"></div>
-            <div class="eva-button eva-record_button"></div>
-            <div class="eva-button eva-trash_button eva-show_on_hold"></div>
-        </div>
-        
-2. Include the js and css files:
-
-   In your `<head>` section add:
-   `<link rel="stylesheet" href="css/chat.css" />`
-    
-   At the end of your `<body>` section add:
-   
-        <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script>
-        <script type="text/javascript" src="js/eva-chat.js"></script>
-        <script type="text/javascript" src="js/eva-app-setup.js"></script>                                                                                
-  
+## Demo Application
+See https://github.com/evature/demo-voicekit-cordova/ for an example of a demo application 
 
  
- ## eva.init
+## eva.init
  
  Before you can start using Eva you need to initialize it: call  `eva.init(site_code, api_key, callback)` with your credentials.
  The callback will receive a parameter result
+ 
     `result.status` =  one of  ['ok', 'warning', 'error']
     `result.message` = a description of the error (if status != 'ok')
-  If the result is of type `error` (this should never happen!) it means the service or the connectivity to it is currently unavailable - contact info@evature.com for details. If this is the case you should hide the record-button since the service might not be operational.
+    
+  If the result is of type `error` (this should never happen!) it means the service or the connectivity to it is currently unavailable - contact info@evature.com for details. If this is the case you should hide record button since the service might not be operational.
+  
+## eva.scope
 
+If your app supports only certain types of travel queries, set `eva.scope` when you initialize your app according to http://www.evature.com/docs/request.html#scope
+
+## UI setup
+
+Call `eva.setupUI();` after eva.init is successful to setup the UI.
+  
   
 # Applicative Callbacks
 
