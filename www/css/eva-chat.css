@@ -4,7 +4,7 @@
 	bottom: 0px;
 	width:100%;
 	height:96px;
-	z-index: 1000;
+	z-index: 12000;
 }
 
 #eva-voice_search_cont > .eva-button {
@@ -142,7 +142,7 @@
 
 #eva-cover {
 	background: rgba(0, 0, 0, 0.92);
-	z-index: 25;
+	z-index: 11000;
 	
 	position: fixed;
     top: 0;

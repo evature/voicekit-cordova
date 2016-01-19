@@ -863,11 +863,21 @@ module.exports = {
 //	  return true;
 //	};  
 	
-	
-	setupUI: function(noAddHtml) {
+	/****
+	 * options - optional object
+	 * 
+	 * minZIndex - the z-index of the chat-bubbles (defaulting to 11000)
+	 * maxZIndex - the z-index of the chat-buttons (defaulting minZIndex+1000)
+	 */
+	setupUI: function(options) {
 		var flag = false;
 		var showTimeout = false;
-		
+		if (!options) {
+			options = {};
+		}
+		if ($('#eva-css').length == 0) {
+			$('head').append('<link id="eva-css" rel="stylesheet" type="text/css" href="css/eva-chat.css" />');
+		}
 		if ($('#eva-cover').length == 0) {
 			$('body').append($('<div id="eva-cover"><ul id="eva-chat-cont"></ul></div>'+
 					'<div id="eva-voice_search_cont">'+
@@ -882,6 +892,16 @@ module.exports = {
 	                '<div class="eva-button eva-trash_button eva-show_on_hold"></div>'+
 	                '</div>')
 	        );
+		}
+		
+		if (options.minZIndex !== undefined) {
+			$('#eva-cover').css('z-index', options.minZIndex);
+			if (options.maxZIndex === undefined) {
+				options.maxZIndex = options.minZIndex + 1000;
+			}
+		}
+		if (options.maxZIndex !== undefined) {
+			$('#eva-voice_search_cont').css('z-index', options.minZIndex+1000);
 		}
 		
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
