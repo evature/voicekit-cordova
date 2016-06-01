@@ -849,6 +849,7 @@ module.exports = {
 			speechSynthesis.cancel();
 			$('#eva-cover').fadeOut(function() {
 				//eva.resetSession(true);
+				$('#eva-cover').hide();
 			});
 			return false;
 		}
@@ -901,7 +902,7 @@ module.exports = {
 			}
 		}
 		if (options.maxZIndex !== undefined) {
-			$('#eva-voice_search_cont').css('z-index', options.minZIndex+1000);
+			$('#eva-voice_search_cont').css('z-index', options.maxZIndex);
 		}
 		
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
