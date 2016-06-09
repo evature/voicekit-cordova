@@ -46,7 +46,7 @@ function handleAppResult(result, eva_chat, flow) {
 	if ('function' === typeof result.then) {
 		// result is a promise - replace "thinking..." with the Eva reply and wait for app result 
 		if (flow.SayIt) {
-			eva.addEvaChat(flow.SayIt, eva_chat, true);
+			eva.addEvaChat(result.SayIt || flow.SayIt, eva_chat, true);
 		}
 		
 		result.then(function success(result) {
@@ -90,7 +90,8 @@ function handleAppResult(result, eva_chat, flow) {
 }
 
 var handleNavigate = function(api_reply, eva_chat, flow) {
-	var navigate_dest = flow.NavigationDestination.replace(/ /g, '');
+	var	navigate_dest = flow.NavigationDestination || '';
+	navigate_dest = navigate_dest.replace(/ /g, '');
 	navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
 	if (eva.callbacks && eva.callbacks[navigate_dest]) {
 		var result = eva.callbacks[navigate_dest]();
@@ -100,6 +101,22 @@ var handleNavigate = function(api_reply, eva_chat, flow) {
 	return false;
 }
 
+var handleReply = function(api_reply, eva_chat, flow) {
+	var navigate_dest = flow.AttributeKey || '';
+	navigate_dest = navigate_dest.replace(/ /g, '');
+	navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
+	if (eva.callbacks && eva.callbacks[navigate_dest]) {
+	    var locations = api_reply['Locations']
+	    var location = locations[flow['RelatedLocations'][0]]
+	    var flight_attrs = location[flow['AttributeType']][flow['AttributeKey']]
+	    var result = eva.callbacks[navigate_dest](flight_attrs);
+	    handleAppResult(result, eva_chat, flow);
+	    return true;
+	}
+    return false;
+
+}
+
 
 var processFlow = function (api_reply, eva_chat) {
 	var flows = api_reply.Flow || [];
@@ -107,15 +124,27 @@ var processFlow = function (api_reply, eva_chat) {
 	// if Eva asks a question then ask it, if navigate to page then do it
 	for (var i=0; i<flows.length; i++) {
 		var flow = flows[i];
+		var handled= false;
 		if (flow.Type == eva.FLOW_TYPE.Navigate) {
-			var handled = handleNavigate(api_reply, eva_chat, flow);
-			if (handled) {
-				return;
-			}
+			handled = handleNavigate(api_reply, eva_chat, flow);
+		}
+		else if (flow.Type == eva.FLOW_TYPE.Reply) {
+			handled = handleReply(api_reply, eva_chat, flow);
+		}
+		if (handled) {
+			return;
 		}
 		if (flow.Type == eva.FLOW_TYPE.Question) {
 			eva.eva_prompt = flow.SayIt;
-			eva.addEvaChat(flow.SayIt, eva_chat, true);
+			if (eva.startRecordingAfterQuestion) {
+				eva.addEvaChat(flow.SayIt, eva_chat, true, false, function() {
+					eva.startRecording();
+				});
+			}
+			else {
+				eva.addEvaChat(flow.SayIt, eva_chat, true);
+			}
+			
 			return;
 		}
 	}
@@ -480,7 +509,8 @@ module.exports = {
 			Car: 'Car',
 			Question: 'Question',
 			Navigate: 'Navigate',
-			Statement: 'Statement'
+			Statement: 'Statement',
+			Reply: 'Reply'
 		},
 	
 	// when starting a new session show these two chat bubbles (user and Eva)
@@ -499,22 +529,35 @@ module.exports = {
 	
 //	var hasSearchResults = false;
 
-	scrollToBottom: function() {
+	_scrollTimer: -1,
+	scrollToBottom: function(toElement) {
 		var $el = $('#eva-cover');
 		var duration = 500;
 	    var el  = $el[0];
 	    var startPosition = el.scrollTop;
-	    var delta = el.scrollHeight - $el.height() - startPosition;
+	    var delta;
+	    if (toElement) {
+	    	delta = toElement.position().top;
+	    }
+	    else {
+	    	delta = el.scrollHeight - $el.height() - startPosition;
+	    }
 
 	    var startTime = Date.now();
-
+	    if (eva._scrollTimer != -1) {
+	    	clearTimeout(eva._scrollTimer);
+	    	eva._scrollTimer = -1;
+	    }
 	    function scroll() {
 	        var fraction = Math.min(1, (Date.now() - startTime) / duration);
 
 	        el.scrollTop = delta * fraction + startPosition;
 
 	        if(fraction < 1) {
-	            setTimeout(scroll, 10);
+	        	eva._scrollTimer = setTimeout(scroll, 10);
+	        }
+	        else {
+	        	eva._scrollTimer = -1;
 	        }
 	    }
 	    scroll();
@@ -535,7 +578,7 @@ module.exports = {
 		return $chat;
 	},
 	
-	addEvaChat: function(text, existing_evachat, speak_it, is_html) {
+	addEvaChat: function(text, existing_evachat, speak_it, is_html, on_end_speech) {
 		var $chat;
 		if (existing_evachat) {
 			$chat = existing_evachat;
@@ -557,22 +600,24 @@ module.exports = {
 
 		if (speak_it) {
 			if (typeof speak_it === 'string' || speak_it instanceof String) {
-				eva.speak(speak_it);
+				eva.speak(speak_it, false, on_end_speech);
 			}
 			else {
 				// speak_it == true - take the jquery.text() of the displayed text
-				eva.speak($chat.text());
+				eva.speak($chat.text(), false, on_end_speech);
 			}
 		}
 		if ($('#eva-chat-cont').length != 0) {
-			eva.scrollToBottom();
-			$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+			setTimeout(function() {
+				eva.scrollToBottom($chat);
+				$chat.removeClass('eva-notViewed').addClass('eva-viewed');
+			},0);
 		}
 		return $chat;
 	},
 	
-
-	speak: function(text, flush) {
+	startRecordingAfterQuestion: false,
+	speak: function(text, flush, onend) {
 		if (flush)
 			speechSynthesis.cancel();
 		
@@ -583,7 +628,7 @@ module.exports = {
 	    u.text = text;
 	    u.lang = "en-US";
 	    u.volume = "1.0";
-	    u.onend = function() { };
+	    u.onend = onend || function() { };
 	    console.log("Speaking: ["+text+"]");
 	    speechSynthesis.speak(u)
 	},
@@ -839,6 +884,7 @@ module.exports = {
 			return false;
 		}*/
 		eva.recording = false;
+		$('.eva-record_button').removeClass('eva-is_recording');
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
 		if ($eva_record_button.hasClass('eva-long-pressed')) {
 			$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'});
