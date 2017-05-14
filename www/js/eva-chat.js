@@ -23,7 +23,7 @@ var getField = function(object, path, defVal) {
 var getAirportCode = function (location) {
 	if (location["All Airports Code"])
 		return location["All Airports Code"];
-		
+
 	if (location["Airports"]) {
 		return location["Airports"].split(',')[0];
 	}
@@ -42,13 +42,13 @@ function handleAppResult(result, eva_chat, flow) {
 	if (!flow ) {
 		flow = {SayIt: ''};
 	}
-	
+
 	if ('function' === typeof result.then) {
-		// result is a promise - replace "thinking..." with the Eva reply and wait for app result 
+		// result is a promise - replace "thinking..." with the Eva reply and wait for app result
 		if (flow.SayIt) {
 			eva.addEvaChat(result.SayIt || flow.SayIt, eva_chat, true);
 		}
-		
+
 		result.then(function success(result) {
 			if (result.display_it) {
 				// note not saying the flow.say_it again because it was already spoken
@@ -70,9 +70,9 @@ function handleAppResult(result, eva_chat, flow) {
 		// this is not a promise - show results right away
 		if (result.display_it) {
 			if (result.append_to_eva_sayit) {
-				eva.addEvaChat(combineSayIt(flow.SayIt, result.display_it), 
-							eva_chat, 
-							combineSayIt(flow.SayIt, resuresult.say_it || result.display_it), 
+				eva.addEvaChat(combineSayIt(flow.SayIt, result.display_it),
+							eva_chat,
+							combineSayIt(flow.SayIt, resuresult.say_it || result.display_it),
 							result.safe_html);
 			}
 			else {
@@ -144,12 +144,12 @@ var processFlow = function (api_reply, eva_chat) {
 			else {
 				eva.addEvaChat(flow.SayIt, eva_chat, true);
 			}
-			
+
 			return;
 		}
 	}
-	
-	// no questions, handle the flow items - speak statements and trigger search/callbacks 
+
+	// no questions, handle the flow items - speak statements and trigger search/callbacks
 	var indexesToSkip = {};
 	for (var i=0; i<flows.length; i++) {
 		if (indexesToSkip[i]) {
@@ -160,17 +160,17 @@ var processFlow = function (api_reply, eva_chat) {
 		if (flow.ReturnTrip) {
 			// override SayIt by ReturnTrip SayIt, if it exists
 			flow.SayIt = flow.ReturnTrip.SayIt;
-			// skip the return segment flow element 
+			// skip the return segment flow element
 			console.log("To skip "+flow.ReturnTrip.ActionIndex);
 			indexesToSkip[flow.ReturnTrip.ActionIndex] = true;
 		}
 
-		
+
 		switch (flow.Type) {
 			case eva.FLOW_TYPE.Statement:
 				eva.addEvaChat(flow.SayIt, eva_chat, true);
 				eva_chat = null;
-				
+
 				switch (flow.StatementType) {
 				case "Understanding":
 				case "Unknown Expression":
@@ -179,7 +179,7 @@ var processFlow = function (api_reply, eva_chat) {
 					break;
 				}
 				break;
-			
+
 			case "Flight":
 				eva.addEvaChat(flow.SayIt, eva_chat, true);
 				eva_chat = null;
@@ -219,7 +219,7 @@ var getDepartDates = function (from_location) {
     		depart_date = new Date(departure_str);
     		depart_date.DATE_ONLY = true;
     	}
-    	
+
 		var restriction = getField(from_location, "Departure.Restriction");
 		if (restriction == "no_later") {
 			depart_date_max = depart_date;
@@ -238,31 +238,31 @@ var getDepartDates = function (from_location) {
 	}
     return {min: depart_date_min, max: depart_date_max}
 };
-	
+
 var findFlightResults = function findFlightResults(api_reply, flow) {
 	if (!eva.callbacks.flightSearch) {
-		return "Flight Search is not supported."; // app did not implement the needed callback 
+		return "Flight Search is not supported."; // app did not implement the needed callback
 	}
-	
+
 	var related_location_idxes = getField(flow, "RelatedLocations", []);
 	var from_location  = getField(api_reply, "Locations", [])[related_location_idxes[0]];
 	var to_location  = getField(api_reply, "Locations", [])[related_location_idxes[1]];
 
 	var from = getField(from_location, "Name", "").replace(/(\(.*\))/, '').trim();
 	var from_code = getAirportCode(from_location);
-	
+
 	var to = getField(to_location, "Name", "").replace(/(\(.*\))/, '').trim();
 	var to_code = getAirportCode(to_location);
-	
+
 	var depart_date = getDepartDates(from_location);
 	var return_date = getDepartDates(to_location);
-	
+
 
     var sort = getField(api_reply, "Request Attributes.Sort");
     if (sort) {
-    	var sort_by = null, sort_order=null;        	
+    	var sort_by = null, sort_order=null;
     	if (sort.By) {
-    		sort_by = sort.By.toLowerCase().replace(/ /g, '_');        		
+    		sort_by = sort.By.toLowerCase().replace(/ /g, '_');
     	}
     	if (sort.Order) {
     		sort_order = sort.Order.toLowerCase().replace(/ /g, '_');
@@ -286,10 +286,10 @@ var findFlightResults = function findFlightResults(api_reply, flow) {
     	seat_class = getField(flight_attr, "Seat Class", null);
     }
     var travelers = getField(api_reply, "Travelers", null);
-    
-    return eva.callbacks.flightSearch( 
-    		from, from_code,  
-    		to, to_code, 
+
+    return eva.callbacks.flightSearch(
+    		from, from_code,
+    		to, to_code,
     		depart_date.min,  depart_date.max,
     		return_date.min,  return_date.max,
             travelers,
@@ -303,14 +303,14 @@ function processResponse(result, user_chat, eva_chat) {
 	console.log("Eva result is "+JSON.stringify(result, null, 4));
 	var api_reply = result.api_reply;
 	var has_warnings = false;
-	
+
 	if (user_chat && api_reply && api_reply.ProcessedText) {
-		
+
 		// add highlighting for sematic parts and parse-warnings
-		
+
 		var spans = [];
-		
-		var warnings = api_reply.Warnings || [];	
+
+		var warnings = api_reply.Warnings || [];
 		for (var i=0; i< warnings.length; i++) {
 			var warning = warnings[i];
 			var type = warning[0];
@@ -330,7 +330,7 @@ function processResponse(result, user_chat, eva_chat) {
 				})
 			}
 		}
-		
+
 		if (api_reply["Last Utterance Parsed Text"]) {
 			var parsedText  = api_reply["Last Utterance Parsed Text"];
 			var times = parsedText["Times"] || [];
@@ -356,13 +356,13 @@ function processResponse(result, user_chat, eva_chat) {
 						text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
 					})
 				}
-			}						
-			
+			}
+
 		}
 		spans.sort(function(a,b) {
 			return a.position - b.position;
 		})
-		
+
 		var prevPos = 0;
 		var resultText = '';
 		for (var i=0; i<spans.length; i++) {
@@ -378,14 +378,14 @@ function processResponse(result, user_chat, eva_chat) {
 		}
 		user_chat.html(resultText);
 	}
-	
+
 	if (result.session_id != eva.session_id && eva.session_id != "1") {
 		// new session was started
 //			stopSearchResults();
 		var chats = $('#chat-cont > li');
 		for (var i=0; i<chats.length; i++) {
 			var $chat = $(chats[i]);
-			var $balloon = $chat.find('div'); 
+			var $balloon = $chat.find('div');
 			if ($balloon[0] == user_chat[0] || $balloon[0] == eva_chat[0]) {
 				continue;
 			}
@@ -393,15 +393,15 @@ function processResponse(result, user_chat, eva_chat) {
 		}
 	}
 	eva.session_id = result.session_id || "1";
-	
+
 	if (!api_reply) {
 		return;
 	}
-	
+
 	if (api_reply.Flow) {
-		
+
 		processFlow(api_reply, eva_chat);
-		
+
 		if (has_warnings) {
 			showUndoTip();
 		}
@@ -433,15 +433,15 @@ module.exports = {
 
 	callbacks: {},
 	VERSION: 'android_cordova_1.0',
-	
+
 	max_matches: 4,
-	
+
 	/***
 	 * Result of an App callback
 	 * @param say_it (optional) - what should be spoken to the user
 	 * @param display_it (optional) - what should be displayed (inside Eva chat bubble) - note can be HTML string or DOM object.
 	 * 					   defaults to the say_it value
-	 * @param result_count (optional) - number of results found 
+	 * @param result_count (optional) - number of results found
 	 */
 	AppResult: function(say_it, display_it, safe_html, result_count) {
 		this.say_it = say_it;
@@ -450,21 +450,21 @@ module.exports = {
 		this.result_count = result_count;
 		this.append_to_eva_sayit = false; // set to true to append the say_it to Eva's reply (which was already displayed and spoken in case of Promise)
 	},
-	
+
 	enums: {
 		FoodType: {
 	        Unknown: "Unknown", // shouldnt get this one
-	
+
 	        // Religious:
 	        Kosher:"Kosher", GlattKosher: "Glatt Kosher", Muslim: "Muslim", Hindu: "Hindu",
 	        // Vegetarian:
-	        Vegetarian: "Vegetarian", Vegan: "Vegan", IndianVegetarian: "Indian Vegetarian", RawVegetarian: "Raw Vegetarian", 
+	        Vegetarian: "Vegetarian", Vegan: "Vegan", IndianVegetarian: "Indian Vegetarian", RawVegetarian: "Raw Vegetarian",
 	        OrientalVegetarian: "Oriental Vegetarian", LactoOvoVegetarian: "Lacto Ovo Vegetarian",
 	        LactoVegetarian: "Lacto Vegetarian", OvoVegetarian: "Ovo Vegetarian", JainVegetarian: "Jain Vegetarian",
 	        // Medical meals:
-	        Bland: "Bland", Diabetic: "Diabetic", FruitPlatter: "Fruit Platter", GlutenFree: "GlutenFree", 
+	        Bland: "Bland", Diabetic: "Diabetic", FruitPlatter: "Fruit Platter", GlutenFree: "GlutenFree",
 	        LowSodium: "Low Sodium", LowCalorie: "Low Calorie", LowFat: "Low Fat", LowFibre: "Low Fibre",
-	        NonCarbohydrate: "Non Carbohydrate", NonLactose: "Non Lactose", SoftFluid: "Soft Fluid", 
+	        NonCarbohydrate: "Non Carbohydrate", NonLactose: "Non Lactose", SoftFluid: "Soft Fluid",
 	        SemiFluid: "Semi Fluid", UlcerDiet: "Ulcer Diet", NutFree: "Nut Free", LowPurine: "Low Purine",
 	        LowProtein: "Low Protein", HighFibre: "High Fibre",
 	        // Infant and child:
@@ -472,21 +472,21 @@ module.exports = {
 	        // Other:
 	        Seafood: "Seafood", Japanese: "Japanese"
 	    },
-	    
+
 	    SeatType: { Unknown: "Unknown", Window: "Window", Aisle: "Aisle" },
 		SeatClass: { Unknown: "Unknown",
 			First: "First", Business: "Business", Premium: "Premium", Economy: "Economy"
 		},
-		
-		
+
+
 		SortEnum: {
 			unknown: "unknown",
-			reviews: "reviews", location: "location", price: "price", price_per_person: "price_per_person", 
-			distance: "distance", rating: "rating", guest_rating: "guest_rating", 
-			stars: "stars", time: "time", total_time: "total_time", duration: "duration", arrival_time: "arrival_time", 
-			departure_time: "departure_time", outbound_arrival_time: "outbound_arrival_time", 
-			outbound_departure_time: "outbound_departure_time", inbound_arrival_time: "inbound_arrival_time", 
-			inbound_departure_time: "inbound_departure_time", airline: "airline", operator: "operator", 
+			reviews: "reviews", location: "location", price: "price", price_per_person: "price_per_person",
+			distance: "distance", rating: "rating", guest_rating: "guest_rating",
+			stars: "stars", time: "time", total_time: "total_time", duration: "duration", arrival_time: "arrival_time",
+			departure_time: "departure_time", outbound_arrival_time: "outbound_arrival_time",
+			outbound_departure_time: "outbound_departure_time", inbound_arrival_time: "inbound_arrival_time",
+			inbound_departure_time: "inbound_departure_time", airline: "airline", operator: "operator",
 			cruiseline: "cruiseline", cruiseship: "cruiseship", name: "name", popularity: "popularity", recommendations: "recommendations"
 		},
 
@@ -494,7 +494,7 @@ module.exports = {
 			unknown: "unknown",
 			ascending: "ascending", descending: "descending", reverse: "reverse"
 		},
-		
+
 		TravelersType: {
 			Infant: "Infant",
 			Child: "Child",
@@ -502,7 +502,7 @@ module.exports = {
 			Elderly: "Elderly"
 		}
 	},
-	
+
 	FLOW_TYPE: {
 			Hotel: 'Hotel',
 			Flight: 'Flight',
@@ -512,21 +512,21 @@ module.exports = {
 			Statement: 'Statement',
 			Reply: 'Reply'
 		},
-	
+
 	// when starting a new session show these two chat bubbles (user and Eva)
 	START_NEW_SEARCH_USER_TEXT: "Start new search.",
 	START_NEW_SEARCH_RESPONSE_TEXT: "Starting a new search, how may I help you?",
-	
-	THINKING_TEXT: "Thinking...", // text in chat bubble while waiting for Eva reply 
-	
+
+	THINKING_TEXT: "Thinking...", // text in chat bubble while waiting for Eva reply
+
 
 	NOT_SUPPORTED_TEXT: "Sorry, this action is not supported yet",
 	INITIAL_PROMPT: "Hello, how can I help you?",
 	eva_prompt: null,
-	
+
 	session_id: "1",
 	recording: false,
-	
+
 //	var hasSearchResults = false;
 
 	_scrollTimer: -1,
@@ -577,7 +577,7 @@ module.exports = {
 		}
 		return $chat;
 	},
-	
+
 	addEvaChat: function(text, existing_evachat, speak_it, is_html, on_end_speech) {
 		var $chat;
 		if (existing_evachat) {
@@ -615,36 +615,39 @@ module.exports = {
 		}
 		return $chat;
 	},
-	
+
 	startRecordingAfterQuestion: false,
 	speak: function(text, flush, onend) {
-		if (flush)
-			speechSynthesis.cancel();
-		
+		if (flush) {
+			//speechSynthesis.cancel();
+      TTS.speak('', function() {}, function() {});
+    }
+
 		if (eva.recording) {
 			return; // don't speak while recording
 		}
-		var u = new SpeechSynthesisUtterance();
-	    u.text = text;
-	    u.lang = "en-US";
-	    u.volume = "1.0";
-	    u.onend = onend || function() { };
+		//   var u = new SpeechSynthesisUtterance();
+	  //   u.text = text;
+	  //   u.lang = "en-US";
+	  //   u.volume = "1.0";
+	  //   u.onend = onend || function() { };
 	    console.log("Speaking: ["+text+"]");
-	    speechSynthesis.speak(u)
+	    // speechSynthesis.speak(u)
+      TTS.speak(text, onend || function() { }, function() {});
 	},
-	
+
 	/*function stopSearchResults() {
 		for (var i=0; i<window.frames.length; i++) {
 			window.frames[i].stop();
 		}
 		$('.eva-search-results').hide();
 	}*/
-	
+
 	resetSession: function(quiet) {
 //		stopSearchResults();
 //		hasSearchResults = false;
 		$('#eva-chat-cont').empty();
-		eva.eva_prompt = eva.INITIAL_PROMPT	
+		eva.eva_prompt = eva.INITIAL_PROMPT
 		if (!quiet) {
 			eva.addMeChat(eva.START_NEW_SEARCH_USER_TEXT);
 			eva.addEvaChat(eva.START_NEW_SEARCH_RESPONSE_TEXT);
@@ -652,7 +655,7 @@ module.exports = {
 		}
 		eva.session_id = "1";
 	},
-	
+
 	undoLastUtterance: function() {
 		//stopSearchResults();
 		var $chat_items = $('#eva-chat-cont > li');
@@ -681,33 +684,33 @@ module.exports = {
 			eva.resetSession();
 		}
 	},
-	
+
 	/*****
 	 * Initialize Eva
 	 * @param site_code
 	 * @param api_key
 	 * @param cb - callback with result
 	 * 		result.status =  one of  ['ok', 'warning', 'error']
-	 * 		result.message = description of the error (if status != 'ok') 
+	 * 		result.message = description of the error (if status != 'ok')
 	 */
 	init: function(site_code, api_key, cb) {
 		SITE_CODE = site_code;
 		API_KEY = api_key;
 		if (!cb) {
-			cb = function(result) { 
+			cb = function(result) {
 				if (result.status == 'error') {
-					console.log(result.message); 
-				} 
+					console.log(result.message);
+				}
 			}
 		}
 		if (!API_KEY || !SITE_CODE) {
 			var message = "No API_KEY!  Register at http://www.evature.com/registration/form and copy-paste it to eva_app_setup.js  - or contact us for help at info@evature.com";
 			alert(message); // this is an integration error, alert the developers
-			cb({ status: 'error', 
+			cb({ status: 'error',
 				message: message});
 			return;
 		}
-		
+
 		eva.eva_prompt = eva.INITIAL_PROMPT
         navigator.geolocation.getCurrentPosition(
     			function(position) { // on success
@@ -720,12 +723,12 @@ module.exports = {
     				console.error('Error getting location: '+error.code+'  - '+error.message)
     			}
     		);
-        
+
 		// test the credentials and verify service is up
 		// make a request to Eva to verify the apiKey/siteCode are valid
 		var host = eva.host || 'https://vproxy.evaws.com';
         var url = host+"/v1.0?site_code="+SITE_CODE+"&api_key="+API_KEY;
-        
+
 		url += '&sdk_version='+eva.VERSION;
 		url += "&android_ver="+encodeURIComponent(getField(window, 'device.version', 'no-version-info'));
 		url += "&device="+encodeURIComponent(getField(window, 'device.model', 'no-model-info'));
@@ -735,7 +738,7 @@ module.exports = {
         $.ajax({
 			url: url,
 			dataType: 'json',
-			success: function(response) { 
+			success: function(response) {
 				if (response.status) {
 					cb({status:'ok'});
 				}
@@ -748,7 +751,7 @@ module.exports = {
 				cb({status:'warning', message: err});
 			}
         });
-        
+
 	},
 
 	searchWithEva: function(texts, user_chat, edit_last) {
@@ -769,7 +772,7 @@ module.exports = {
 		url += "&device="+encodeURIComponent(getField(window, 'device.model', 'no-model-info'));
 		url += "&uid="+encodeURIComponent(getField(window, 'device.uuid', 'no-uuid'));
 		url += "&add_text=true"
-		
+
 		if (eva.location) {
 			url += "&longitude=" + eva.location.longitude + "&latitude=" + eva.location.latitude;
 		}
@@ -782,7 +785,7 @@ module.exports = {
 			}
 		}
 		url += "&session_id="+eva.session_id;
-		
+
 		var eva_chat;
 		if (!edit_last) {
 			eva_chat = eva.addEvaChat(eva.THINKING_TEXT);
@@ -802,7 +805,7 @@ module.exports = {
 		})
 	},
 
-	
+
 	startRecording: function () {
 		if (!navigator.speechrecognizer) {
 			return; // not ready yet
@@ -814,9 +817,9 @@ module.exports = {
 		$('#eva-cover').show();
 		speechSynthesis.cancel();
 		$('.eva-record_button').addClass('eva-is_recording');
-		var meChat = null; 
+		var meChat = null;
 		navigator.speechrecognizer.recognize(
-				function(result) { 
+				function(result) {
 					var texts = result; //result.texts;
 					var isPartial = false; //result.isPartial;
 					if (!isPartial) {
@@ -839,7 +842,7 @@ module.exports = {
 					else {
 						alert("No Speech Results")
 					}
-				}, 
+				},
 				function(e) {
 					eva.recording = false;
 					$('.eva-record_button').removeClass('eva-is_recording');
@@ -851,8 +854,8 @@ module.exports = {
 						meChat.closest('li').fadeOut(function(){ $(this).remove(); })
 						meChat = null;
 					}
-				}, eva.max_matches,  
-				eva.eva_prompt || eva.INITIAL_PROMPT  //, 
+				}, eva.max_matches,
+				eva.eva_prompt || eva.INITIAL_PROMPT  //,
 				//"en-US" /*language*/
 			);
 	},
@@ -890,7 +893,7 @@ module.exports = {
 			$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'});
 			return false;
 		}
-		
+
 		if ($('#eva-cover').is(":visible")) {
 			speechSynthesis.cancel();
 			$('#eva-cover').fadeOut(function() {
@@ -901,18 +904,18 @@ module.exports = {
 		}
 		return true;
 	},
-	
-	
 
-//	window.onerror = function(message, url, lineNumber) {  
+
+
+//	window.onerror = function(message, url, lineNumber) {
 //	  //alert("Error: "+message+"  at line "+lineNumber+"  in url: "+url);
 //	  console.error("Error: "+message+" at line "+lineNumber+"  in url: "+url);
 //	  return true;
-//	};  
-	
+//	};
+
 	/****
 	 * options - optional object
-	 * 
+	 *
 	 * minZIndex - the z-index of the chat-bubbles (defaulting to 11000)
 	 * maxZIndex - the z-index of the chat-buttons (defaulting minZIndex+1000)
 	 */
@@ -940,7 +943,7 @@ module.exports = {
 	                '</div>')
 	        );
 		}
-		
+
 		if (options.minZIndex !== undefined) {
 			$('#eva-cover').css('z-index', options.minZIndex);
 			if (options.maxZIndex === undefined) {
@@ -950,9 +953,9 @@ module.exports = {
 		if (options.maxZIndex !== undefined) {
 			$('#eva-voice_search_cont').css('z-index', options.maxZIndex);
 		}
-		
+
 		var $eva_record_button = $('#eva-voice_search_cont > .eva-record_button');
-		
+
 		$eva_record_button.removeClass('eva-is_recording');
 		$eva_record_button.on('touchstart mousedown', function(e) {
 			console.log("touchstart record_button");
@@ -969,11 +972,11 @@ module.exports = {
 			}
 			return false;
 		});
-		
+
 		$eva_record_button.on('touchmove', function(e) {
 			if (!$('#eva-cover').is(":visible")) {
 				$eva_record_button.removeClass('eva-long-pressed').css({'transform': 'translateX(0)', '-webkit-transform':'translateX(0)'})
-				return; // can't move microphone button while not in chat-overlay 
+				return; // can't move microphone button while not in chat-overlay
 			}
 			var delta = e.touches[0].pageX - $(window).width()/2;
 			var translate = 'translateX('+ delta +'px)';
@@ -990,7 +993,7 @@ module.exports = {
 			}
 			$eva_record_button.css({'transform': translate, '-webkit-transform':translate});
 			var $trash_button = $('.eva-trash_button');
-			if ($trash_button.is(":visible") 
+			if ($trash_button.is(":visible")
 					&& e.touches[0].pageX >  $trash_button.position().left-5
 					&& e.touches[0].pageY >  $trash_button.position().top-5
 			) {
@@ -999,9 +1002,9 @@ module.exports = {
 			else {
 				$trash_button.removeClass('eva-hovered');
 			}
-			
+
 			var $undo_button = $('.eva-undo_button');
-			if ($undo_button.is(":visible") 
+			if ($undo_button.is(":visible")
 					&& e.touches[0].pageX <  $undo_button.position().left+$undo_button.width()+5
 					&& e.touches[0].pageY >  $undo_button.position().top-5
 			) {
@@ -1012,7 +1015,7 @@ module.exports = {
 			}
 			return false;
 		});
-		
+
 		// to work both mouse and touch - without waiting for click delay
 		$eva_record_button.on('touchend mouseup', function(e) {
 			console.log("touchend record_button");
@@ -1027,23 +1030,23 @@ module.exports = {
 //					var chat = eva.addMeChat(texts[0]);
 //					eva.searchWithEva(texts, chat)
 				}
-				
+
 				if (hoveringUndo) {
 					window.navigator.vibrate(25);
 					eva.undoLastUtterance();
 				}
-			
+
 				$('.eva-show_on_hold').removeClass('eva-hovered');
 				$('.eva-show_on_hold').fadeOut(55);
 				if (showTimeout) {
 					clearTimeout(showTimeout);
 					showTimeout = false;
 				}
-				
+
 				if ($('.eva-undo_button').is(":visible") == false) {
 				    flag = true;
 				    setTimeout(function(){ flag = false; }, 100);
-				    
+
 				    eva.startRecording();
 					/* Below is needed for recorder that is background thread, not dialog (replace instead of the startRecording above)
 					 * if (eva.recording) {
@@ -1065,11 +1068,11 @@ module.exports = {
 					}*/
 				}
 			}
-			
-			
+
+
 			return false
 		});
-		
+
 		$(document).on('backbutton', eva.onBackKeyDown);
 
 		/*$('#eva-chat-cont').on('click', '.eva-chat', function(e) {
@@ -1080,16 +1083,16 @@ module.exports = {
 			}
 			return false;
 		});*/
-		
-		
+
+
 		/*$('#search-results').load(function(){
 			hasSearchResults= true;
 			console.log('loaded the iframe to '+$(this).attr('src'));
 	        $('.search-results').show();
 	    });*/
-		
-		
-		
+
+
+
 	}
 
 }
