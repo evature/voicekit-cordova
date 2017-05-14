@@ -1,0 +1,32 @@
+{
+  "name": "voicekit-cordova",
+  "version": "1.0.1",
+  "description": "Evature VoiceKit Plugin",
+  "cordova": {
+    "id": "com.evature.cordova.voicekit",
+    "platforms": ["Android"]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evature/voicekit-cordova.git"
+  },
+  "keywords": [
+    "Evature",
+    "voicekit",
+    "travel",
+    "chat",
+    "ecosystem:cordova"
+  ],
+  "engines": [
+    {
+      "name": "cordova",
+      "version": ">=3.4.0"
+    }
+  ],
+  "author": "Evature",
+  "license": "Apache 2.0",
+  "bugs": {
+    "url": "https://github.com/evature/voicekit-cordova/issues"
+  },
+  "homepage": "https://github.com/evature/voicekit-cordova#readme"
+}
