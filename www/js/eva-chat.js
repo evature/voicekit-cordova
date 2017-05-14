@@ -633,7 +633,10 @@ module.exports = {
 	  //   u.onend = onend || function() { };
 	    console.log("Speaking: ["+text+"]");
 	    // speechSynthesis.speak(u)
-      TTS.speak(text, onend || function() { }, function() {});
+      TTS.speak(text,
+         onend || function() { },
+         function() {}
+       );
 	},
 
 	/*function stopSearchResults() {
