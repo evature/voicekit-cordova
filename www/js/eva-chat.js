@@ -186,14 +186,18 @@ var processFlow = function (api_reply, eva_chat) {
 				var result = findFlightResults(api_reply, flow);
 				handleAppResult(result, null, null);
 				break;
+
+      case "Hotel":
+        eva.addEvaChat(flow.SayIt, eva_chat, true);
+        eva_chat = null;
+        var result = findHotelResults(api_reply, flow);
+        handleAppResult(result, null, null);
+        break;
+
 			case "Car":
-			case "Hotel":
 			case "Explore":
 			case "Train":
 			case "Cruise":
-				// TODO
-				break;
-
 			case "Navigate":
 				// if not handled then not supported
 				eva.addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
@@ -205,39 +209,168 @@ var processFlow = function (api_reply, eva_chat) {
 	}
 }
 
-var getDepartDates = function (from_location) {
-	var depart_date_min = null;
-    var depart_date_max = null;
-    var departure_str = getField(from_location, "Departure.Date", null);
-    if (departure_str != null) {
-    	var time = getField(from_location, "Departure.Time");
-    	var depart_date;
-    	if (time) {
-    		depart_date = new Date(departure_str+ " "+time);
-    	}
-    	else {
-    		depart_date = new Date(departure_str);
-    		depart_date.DATE_ONLY = true;
-    	}
 
-		var restriction = getField(from_location, "Departure.Restriction");
-		if (restriction == "no_later") {
-			depart_date_max = depart_date;
-		}
-		else if (restriction == "no_earlier") {
-			depart_date_min = depart_date;
-		}
-		else {
-			depart_date_max = depart_date_min = depart_date;
-		}
-		var days_delta = getField(from_location, "Departure.Delta");
+	function daysDelta(days_delta) {
 		if (days_delta && days_delta.startsWith('days=+')) {
-			days_delta = parseInt(days_delta.slice(6), 10);
-			depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
+			return parseInt(days_delta.slice(6), 10);
 		}
+		return days_delta;
 	}
-    return {min: depart_date_min, max: depart_date_max}
-};
+
+	function getDates(from_location, field) {
+		var depart_date_min = null;
+	    var depart_date_max = null;
+		var time_field = getField(from_location, field);
+	    var departure_str = getField(time_field, "Date", null);
+        if (departure_str != null) {
+        	var time = getField(time_field, "Time");
+        	var depart_date;
+        	if (time) {
+        		depart_date = new Date(departure_str+ " "+time);
+        	}
+        	else {
+        		depart_date = new Date(departure_str);
+        		depart_date.DATE_ONLY = true;
+        	}
+
+			var restriction = getField(time_field, "Restriction");
+			if (restriction == "no_later") {
+				depart_date_max = depart_date;
+			}
+			else if (restriction == "no_earlier") {
+				depart_date_min = depart_date;
+			}
+			else {
+				depart_date_max = depart_date_min = depart_date;
+			}
+			var days_delta = getField(time_field, "Delta");
+			if (days_delta && days_delta.startsWith('days=+')) {
+				days_delta = daysDelta(days_delta);
+				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
+			}
+		}
+        return {min: depart_date_min, max: depart_date_max}
+	}
+
+	function getDepartDates(from_location) {
+		return getDates(from_location, "Departure");
+	}
+
+	function getArrivalDates(to_location) {
+		return getDates(to_location, "Arrival");
+	}
+
+
+function findHotelResults(api_reply, flow) {
+  if (!eva.callbacks.hotelSearch) {
+    return "Hotel Search is not supported.";
+  }
+  var related_location_idxes = getField(flow, "RelatedLocations", []);
+  var location  = getField(api_reply, "Locations", [])[related_location_idxes[0]];
+
+  var location_name = getField(location, "Name", "").replace(/(\(.*\))/, '').trim();
+  var location_code =  getAirportCode(location);
+
+  var arrival = getArrivalDates(location);
+
+  var durationMin=null, durationMax = null;
+  if (location && location.Stay) {
+    if (location.Stay.MinDelta && location.Stay.MaxDelta) {
+      durationMin = daysDelta(location.Stay.MinDelta);
+      durationMax = daysDelta(location.Stay.MaxDelta);
+    } else {
+      durationMin = daysDelta(location.Stay.Delta);
+      durationMax = durationMin;
+    }
+  }
+
+  var travelers = getField(api_reply, "Travelers", null);
+    var sort = getField(api_reply, "Request Attributes.Sort");
+    if (sort) {
+      var sort_by = null, sort_order=null;
+      if (sort.By) {
+        sort_by = sort.By.toLowerCase().replace(/ /g, '_');
+      }
+      if (sort.Order) {
+        sort_order = sort.Order.toLowerCase().replace(/ /g, '_');
+      }
+    }
+
+
+  eva.callbacks.hotelSearch(location_name, location,
+                          arrival.min, arrival.max,
+                          durationMin, durationMax,
+                          travelers,
+                          null, // other attributes
+              sort_by, sort_order);
+/*
+
+
+     ArrayList<HotelAttributes.HotelChain> chains = new ArrayList<>();
+     // The hotel board:
+     Boolean selfCatering = null;
+     Boolean bedAndBreakfast = null;
+     Boolean halfBoard = null;
+     Boolean fullBoard = null;
+     Boolean allInclusive = null;
+     Boolean drinksInclusive = null;
+
+     // The quality of the hotel, measure in Stars
+     Integer minStars = null;
+     Integer maxStars = null;
+
+     HashSet<HotelAttributes.Amenities> amenities = new HashSet<>();
+
+     if (reply.hotelAttributes ) {
+         HotelAttributes ha = reply.hotelAttributes;
+         selfCatering = ha.selfCatering;
+         bedAndBreakfast = ha.bedAndBreakfast;
+         halfBoard = ha.halfBoard;
+         fullBoard = ha.fullBoard;
+         allInclusive = ha.allInclusive;
+         drinksInclusive = ha.drinksInclusive;
+
+         chains = ha.chains;
+         minStars = ha.minStars;
+         maxStars = ha.maxStars;
+         amenities = ha.amenities;
+     }
+
+     if (location.hotelAttributes ) {
+         HotelAttributes ha = location.hotelAttributes;
+         if (ha.selfCatering ) {
+             selfCatering = ha.selfCatering;
+         }
+         if (ha.bedAndBreakfast ) {
+             bedAndBreakfast = ha.bedAndBreakfast;
+         }
+         if (ha.halfBoard ) {
+             halfBoard = ha.halfBoard;
+         }
+         if (ha.fullBoard ) {
+             fullBoard = ha.fullBoard;
+         }
+         if (ha.allInclusive ) {
+             allInclusive = ha.allInclusive;
+         }
+         if (ha.drinksInclusive ) {
+             drinksInclusive = ha.drinksInclusive;
+         }
+         if (ha.chains ) {
+             chains = ha.chains;
+         }
+         if (ha.minStars ) {
+             minStars = ha.minStars;
+         }
+         if (ha.maxStars ) {
+             maxStars = ha.maxStars;
+         }
+         if (ha.amenities ) {
+             amenities = ha.amenities;
+         }
+
+     }*/
+}
 
 var findFlightResults = function findFlightResults(api_reply, flow) {
 	if (!eva.callbacks.flightSearch) {
@@ -331,6 +464,11 @@ function processResponse(result, user_chat, eva_chat) {
 			}
 		}
 
+    function jsUcfirst(string)
+    {
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
 		if (api_reply["Last Utterance Parsed Text"]) {
 			var parsedText  = api_reply["Last Utterance Parsed Text"];
 			var times = parsedText["Times"] || [];
@@ -341,7 +479,7 @@ function processResponse(result, user_chat, eva_chat) {
 					spans.push({
 						position: position,
 						positionEnd: position+time.Text.length,
-						text: "<span class='eva-time'>"+time.Text.replace(/</g, "&lt;")+"</span>"
+						text: "<span class='eva-time'>"+jsUcfirst(time.Text).replace(/</g, "&lt;")+"</span>"
 					})
 				}
 			}
@@ -353,7 +491,7 @@ function processResponse(result, user_chat, eva_chat) {
 					spans.push({
 						position: position,
 						positionEnd: position+location.Text.length,
-						text: "<span class='eva-location'>"+location.Text.replace(/</g, "&lt;")+"</span>"
+						text: "<span class='eva-location'>"+jsUcfirst(location.Text).replace(/</g, "&lt;")+"</span>"
 					})
 				}
 			}
@@ -714,18 +852,18 @@ module.exports = {
 			return;
 		}
 
-		eva.eva_prompt = eva.INITIAL_PROMPT
-        navigator.geolocation.getCurrentPosition(
-    			function(position) { // on success
-    				var coords = position.coords;
-    				eva.location = coords;
-    				console.log("Got location:  lat="+coords.latitude+', long='+coords.longitude+
-    							' accuracy='+coords.accuracy);  // heading, speed, 	altitude, altitudeAccuracy
-    			},
-    			function(error) { // on error
-    				console.error('Error getting location: '+error.code+'  - '+error.message)
-    			}
-    		);
+		eva.eva_prompt = eva.INITIAL_PROMPT;
+    navigator.geolocation.getCurrentPosition(
+			function(position) { // on success
+				var coords = position.coords;
+				eva.location = coords;
+				console.log("Got location:  lat="+coords.latitude+', long='+coords.longitude+
+							' accuracy='+coords.accuracy);  // heading, speed, 	altitude, altitudeAccuracy
+			},
+			function(error) { // on error
+				console.error('Error getting location: '+error.code+'  - '+error.message)
+			}
+		);
 
 		// test the credentials and verify service is up
 		// make a request to Eva to verify the apiKey/siteCode are valid
@@ -808,61 +946,95 @@ module.exports = {
 		})
 	},
 
+  _startRecordingActual: function() {
+    eva.recording = true;
+    if ($('#eva-chat-cont > li').length == 0) {
+      eva.addEvaChat(eva.INITIAL_PROMPT);
+    }
+    $('#eva-cover').show();
+
+    //speechSynthesis.cancel();
+    eva.speak('', true);
+    $('.eva-record_button').addClass('eva-is_recording');
+    var meChat = null;
+
+      window.plugins.speechRecognition.startListening(
+        function successCallback(result) {
+          var texts = result; //result.texts;
+          var isPartial = false; //result.isPartial;
+          if (!isPartial) {
+            eva.recording = false;
+            $('.eva-record_button').removeClass('eva-is_recording');
+          }
+          if (texts.length > 0) {
+            if (!meChat) {
+              meChat = eva.addMeChat("...");
+            }
+            if (isPartial) {
+              meChat.text(texts[0]+"...");
+            }
+            else {
+              meChat.text(texts[0]);
+              eva.searchWithEva(texts, meChat);
+              meChat = null;
+            }
+          }
+          else {
+            alert("No Speech Results")
+          }
+        },
+
+        function errorRecordingCallback(e) {
+          eva.recording = false;
+          $('.eva-record_button').removeClass('eva-is_recording');
+          if (e != 0 ) {
+            // error=0 is user canceled - not really an error
+            console.error("Speech Recognition Error "+e);
+          }
+          if (meChat != null) {
+            meChat.closest('li').fadeOut(function(){ $(this).remove(); })
+            meChat = null;
+          }
+        },
+
+        {
+          matches: eva.max_matches,
+          prompt: eva.eva_prompt || eva.INITIAL_PROMPT,
+          language: "en-US",
+          showPopup: true
+        }
+      );
+  },
 
 	startRecording: function () {
-		if (!navigator.speechrecognizer) {
-			return; // not ready yet
-		}
-		eva.recording = true;
-		if ($('#eva-chat-cont > li').length == 0) {
-			eva.addEvaChat(eva.INITIAL_PROMPT);
-		}
-		$('#eva-cover').show();
+    var errorCallback = function errorCallback(e) {
+      console.log("Error ", e);
+      $('.eva-record_button').removeClass('eva-is_recording');
+      eva.recording = false;
+    }
 
-		//speechSynthesis.cancel();
-    eva.speak('', true);
-		$('.eva-record_button').addClass('eva-is_recording');
-		var meChat = null;
-		navigator.speechrecognizer.recognize(
-				function(result) {
-					var texts = result; //result.texts;
-					var isPartial = false; //result.isPartial;
-					if (!isPartial) {
-						eva.recording = false;
-						$('.eva-record_button').removeClass('eva-is_recording');
-					}
-					if (texts.length > 0) {
-						if (!meChat) {
-							meChat = eva.addMeChat("...");
-						}
-						if (isPartial) {
-							meChat.text(texts[0]+"...");
-						}
-						else {
-							meChat.text(texts[0]);
-							eva.searchWithEva(texts, meChat);
-							meChat = null;
-						}
-					}
-					else {
-						alert("No Speech Results")
-					}
-				},
-				function(e) {
-					eva.recording = false;
-					$('.eva-record_button').removeClass('eva-is_recording');
-					if (e != 0 ) {
-						// error=0 is user canceled - not really an error
-						console.error("Speech Recognition Error "+e);
-					}
-					if (meChat != null) {
-						meChat.closest('li').fadeOut(function(){ $(this).remove(); })
-						meChat = null;
-					}
-				}, eva.max_matches,
-				eva.eva_prompt || eva.INITIAL_PROMPT  //,
-				//"en-US" /*language*/
-			);
+
+    window.plugins.speechRecognition.isRecognitionAvailable(
+      function successCallback() {
+        window.plugins.speechRecognition.hasPermission(
+          function hasPermission(p) {
+            if (p) {
+              eva._startRecordingActual();
+            }
+            else {
+              window.plugins.speechRecognition.requestPermission(
+                function gotPermission(p) {
+                  eva._startRecordingActual();
+                },
+                errorCallback
+              );
+            }
+          },
+          errorCallback
+        );
+      },
+      errorCallback
+    )
 	},
 
 	onBackKeyDown: function (e) {

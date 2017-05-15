@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
-        id="com.evature.cordova.voicekit" version="1.0.2">
+        id="com.evature.cordova.voicekit" version="1.0.3">
     <name>VoiceKit</name>
     <description>Evature VoiceKit Plugin</description>
     <license>Apache 2.0</license>
@@ -11,11 +11,11 @@
         <engine name="cordova" version=">=3.4.0"/>
     </engines>
 
-    <dependency id="com.manueldeveloper.speech-recognizer" url="https://github.com/manueldeveloper/cordova-plugin-speech-recognizer.git" commit="3a78b72c3f3063bda2389e5c866fb26097a9d07c"  />
-    <dependency id="cordova-plugin-device" url="https://github.com/apache/cordova-plugin-device.git" commit="8846ac877b2c2c05e2bad4f99ecd113b64550d8d" />
-    <dependency id="cordova-plugin-geolocation" url="https://github.com/apache/cordova-plugin-geolocation.git" commit="2134d2b89d386069a4844a13bf5807ed2416e518" />
+    <dependency id="cordova-plugin-speechrecognition" url="https://github.com/pbakondy/cordova-plugin-speechrecognition.git" commit="master"  />
+    <dependency id="cordova-plugin-device" url="https://github.com/apache/cordova-plugin-device.git" commit="master" />
+    <dependency id="cordova-plugin-geolocation" url="https://github.com/apache/cordova-plugin-geolocation.git" commit="master" />
     <dependency id="cordova-plugin-tts" url="https://github.com/vilic/cordova-plugin-tts" commit="master" />
-    <dependency id="cordova-plugin-vibration" url="https://github.com/apache/cordova-plugin-vibration.git" commit="c5e7221e238ad2c78842ce973ba9c66be2dd16e1" />
+    <dependency id="cordova-plugin-vibration" url="https://github.com/apache/cordova-plugin-vibration.git" commit="master" />
 
 
     <asset src="www/img" target="img" />
