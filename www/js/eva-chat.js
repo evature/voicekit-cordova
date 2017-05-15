@@ -94,10 +94,24 @@ var handleNavigate = function(api_reply, eva_chat, flow) {
 	navigate_dest = navigate_dest.replace(/ /g, '');
 	navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
 	if (eva.callbacks && eva.callbacks[navigate_dest]) {
-		var result = eva.callbacks[navigate_dest]();
+    var attrs = null;
+    if (flow['AttributeKey'] && flow['AttributeType']) {
+	    var locations = api_reply['Locations'];
+      if (flow['RelatedLocations']) {
+  	    var location = locations[flow['RelatedLocations'][0]]
+  	    attrs = location[flow['AttributeType']][flow['AttributeKey']];
+      }
+      else {
+        attrs = api_reply[flow['AttributeType']][flow['AttributeKey']];
+      }
+    }
+		var result = eva.callbacks[navigate_dest](attrs);
 		handleAppResult(result, eva_chat, flow);
 		return true;
 	}
+  else {
+    console.log("callback "+navigate_dest+" not implemented");
+  }
 	return false;
 }
 
@@ -106,14 +120,25 @@ var handleReply = function(api_reply, eva_chat, flow) {
 	navigate_dest = navigate_dest.replace(/ /g, '');
 	navigate_dest = navigate_dest.charAt(0).toLowerCase()+navigate_dest.slice(1);
 	if (eva.callbacks && eva.callbacks[navigate_dest]) {
-	    var locations = api_reply['Locations']
-	    var location = locations[flow['RelatedLocations'][0]]
-	    var flight_attrs = location[flow['AttributeType']][flow['AttributeKey']]
-	    var result = eva.callbacks[navigate_dest](flight_attrs);
-	    handleAppResult(result, eva_chat, flow);
-	    return true;
+    var attrs = null;
+    if (flow['AttributeKey'] && flow['AttributeType']) {
+	    var locations = api_reply['Locations'];
+      if (flow['RelatedLocations']) {
+  	    var location = locations[flow['RelatedLocations'][0]]
+  	    attrs = location[flow['AttributeType']][flow['AttributeKey']];
+      }
+      else {
+        attrs = api_reply[flow['AttributeType']][flow['AttributeKey']];
+      }
+    }
+    var result = eva.callbacks[navigate_dest](attrs);
+    handleAppResult(result, eva_chat, flow);
+    return true;
 	}
-    return false;
+  else {
+    console.log("callback "+navigate_dest+" not implemented");
+  }
+  return false;
 
 }
 
@@ -171,21 +196,21 @@ var processFlow = function (api_reply, eva_chat) {
 				eva.addEvaChat(flow.SayIt, eva_chat, true);
 				eva_chat = null;
 
-				switch (flow.StatementType) {
-				case "Understanding":
-				case "Unknown Expression":
-				case "Unsupported":
-					showUndoTip();
-					break;
-				}
-				break;
+      switch (flow.StatementType) {
+        case "Understanding":
+        case "Unknown Expression":
+        case "Unsupported":
+        	showUndoTip();
+        	break;
+        }
+        break;
 
-			case "Flight":
-				eva.addEvaChat(flow.SayIt, eva_chat, true);
-				eva_chat = null;
-				var result = findFlightResults(api_reply, flow);
-				handleAppResult(result, null, null);
-				break;
+      case "Flight":
+        eva.addEvaChat(flow.SayIt, eva_chat, true);
+        eva_chat = null;
+        var result = findFlightResults(api_reply, flow);
+        handleAppResult(result, null, null);
+        break;
 
       case "Hotel":
         eva.addEvaChat(flow.SayIt, eva_chat, true);
@@ -194,16 +219,12 @@ var processFlow = function (api_reply, eva_chat) {
         handleAppResult(result, null, null);
         break;
 
-			case "Car":
-			case "Explore":
-			case "Train":
-			case "Cruise":
-			case "Navigate":
-				// if not handled then not supported
-				eva.addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
-				showUndoTip();
-				eva_chat = null;
-				break;
+      default:
+        // if not handled then not supported
+        eva.addEvaChat(eva.NOT_SUPPORTED_TEXT, eva_chat, true);
+        showUndoTip();
+        eva_chat = null;
+        break;
 
 		}
 	}
@@ -219,19 +240,22 @@ var processFlow = function (api_reply, eva_chat) {
 
 	function getDates(from_location, field) {
 		var depart_date_min = null;
-	    var depart_date_max = null;
+	  var depart_date_max = null;
 		var time_field = getField(from_location, field);
-	    var departure_str = getField(time_field, "Date", null);
-        if (departure_str != null) {
-        	var time = getField(time_field, "Time");
-        	var depart_date;
-        	if (time) {
-        		depart_date = new Date(departure_str+ " "+time);
-        	}
-        	else {
-        		depart_date = new Date(departure_str);
-        		depart_date.DATE_ONLY = true;
-        	}
+    if (!time_field) {
+      return {min: depart_date_min, max: depart_date_max}
+    }
+    var departure_str = getField(time_field, "Date", null);
+    if (departure_str != null) {
+    	var time = getField(time_field, "Time");
+    	var depart_date;
+    	if (time) {
+    		depart_date = new Date(departure_str+ " "+time);
+    	}
+    	else {
+    		depart_date = new Date(departure_str);
+    		depart_date.DATE_ONLY = true;
+    	}
 
 			var restriction = getField(time_field, "Restriction");
 			if (restriction == "no_later") {
@@ -249,7 +273,7 @@ var processFlow = function (api_reply, eva_chat) {
 				depart_date_max = new Date(+depart_date + 24*3600*1000*days_delta);
 			}
 		}
-        return {min: depart_date_min, max: depart_date_max}
+    return {min: depart_date_min, max: depart_date_max}
 	}
 
 	function getDepartDates(from_location) {
@@ -464,9 +488,15 @@ function processResponse(result, user_chat, eva_chat) {
 			}
 		}
 
-    function jsUcfirst(string)
+    function toTitleCase(str)
     {
-        return string.charAt(0).toUpperCase() + string.slice(1);
+        return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1);});
+    }
+
+    function uppercaseDays(str) {
+      return str.replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|christmas)\b/gi,
+      function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();}
+    )
     }
 
 		if (api_reply["Last Utterance Parsed Text"]) {
@@ -479,7 +509,7 @@ function processResponse(result, user_chat, eva_chat) {
 					spans.push({
 						position: position,
 						positionEnd: position+time.Text.length,
-						text: "<span class='eva-time'>"+jsUcfirst(time.Text).replace(/</g, "&lt;")+"</span>"
+						text: "<span class='eva-time'>"+uppercaseDays(time.Text).replace(/</g, "&lt;")+"</span>"
 					})
 				}
 			}
@@ -491,7 +521,7 @@ function processResponse(result, user_chat, eva_chat) {
 					spans.push({
 						position: position,
 						positionEnd: position+location.Text.length,
-						text: "<span class='eva-location'>"+jsUcfirst(location.Text).replace(/</g, "&lt;")+"</span>"
+						text: "<span class='eva-location'>"+toTitleCase(location.Text).replace(/</g, "&lt;")+"</span>"
 					})
 				}
 			}
@@ -658,7 +688,7 @@ module.exports = {
 	THINKING_TEXT: "Thinking...", // text in chat bubble while waiting for Eva reply
 
 
-	NOT_SUPPORTED_TEXT: "Sorry, this action is not supported yet",
+	NOT_SUPPORTED_TEXT: "Sorry, this action is not supported yet. Lazy developers...",
 	INITIAL_PROMPT: "Hello, how can I help you?",
 	eva_prompt: null,
 

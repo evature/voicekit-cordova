@@ -1,6 +1,6 @@
 {
   "name": "voicekit-cordova",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Evature VoiceKit Plugin",
   "cordova": {
     "id": "com.evature.cordova.voicekit",
