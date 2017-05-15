@@ -10,7 +10,7 @@
 
 #eva-voice_search_cont > .eva-button {
 	border-radius: 200px;
-	-webkit-touch-callout: none;	
+	-webkit-touch-callout: none;
 	-webkit-transition: all .25s ease-in;
     -moz-transition: all .25s ease-in;
     -ms-transition: all .25s ease-in;
@@ -24,10 +24,10 @@
 	height: 76px;
 	background-color: #d44136;
 	background-image: url("../img/eva-microphone-button.svg");
-    background-size: 60% 60%;
+    background-size: 35% 60%;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    background-position: center; 
+    background-position: center;
     display: inline-block;
     box-shadow: 0px 4px 5px rgba(0,0,0,0.8);
     pointer-events: auto;
@@ -42,7 +42,7 @@
 
 .eva-record_button.eva-long-pressed {
 	background-image: none;
-	background-color: white; 
+	background-color: white;
 	box-shadow: 0px 0px 44px 34px white;
 	width: 10px;
 	height: 10px;
@@ -100,9 +100,9 @@
 .eva-me-chat .eva-error {
 	/*color: red;*/
 	/*font-style: italic;*/
-	
+
 	/*text-decoration: underline wavy red;  -  only works in firefox :(  below is a cross browser wavy line */
-	
+
     display: inline-block;
     position:relative;
     background: url("../img/eva-err-underline.gif") bottom repeat-x;
@@ -148,7 +148,7 @@
 #eva-cover {
 	background: rgba(0, 0, 0, 0.92);
 	z-index: 11000;
-	
+
 	position: fixed;
     top: 0;
     left: 0;
@@ -181,7 +181,7 @@
 }
 .eva-animBlock[data-position="eva-left"] { left: -100%; }
 .eva-animBlock[data-position="eva-right"] { right: -100%; }
- 
+
 .eva-animBlock[data-position="eva-left"].eva-viewed {
   left: 0%;
   opacity: 1;
@@ -207,7 +207,7 @@
 }
 
 
-.eva-right-bubble 
+.eva-right-bubble
 {
 	position: relative;
 	padding: 15px 10px;
@@ -221,7 +221,7 @@
 	border: #1A2152 solid 2px;
 }
 
-.eva-right-bubble:after 
+.eva-right-bubble:after
  {
 	content: '';
 	position: absolute;
@@ -250,7 +250,7 @@
 
 
 
-.eva-left-bubble 
+.eva-left-bubble
 {
 	position: relative;
 	padding: 15px;
@@ -264,7 +264,7 @@
 	border: #6D706F solid 2px;
 }
 
-.eva-left-bubble:after 
+.eva-left-bubble:after
 {
     content: '';
 	position: absolute;
@@ -313,22 +313,22 @@
 }
 
 .eva-slidewell > h2 {
-  background: -moz-linear-gradient(left, #4d4d4d, 0.4, #4d4d4d, 0.5, white, 0.6, #4d4d4d, #4d4d4d); 
-  background: -webkit-gradient(linear,left top,right top,color-stop(0, #4d4d4d),color-stop(0.4, #4d4d4d),color-stop(0.5, white),color-stop(0.6, #4d4d4d),color-stop(1, #4d4d4d)); 
-  
+  background: -moz-linear-gradient(left, #4d4d4d, 0.4, #4d4d4d, 0.5, white, 0.6, #4d4d4d, #4d4d4d);
+  background: -webkit-gradient(linear,left top,right top,color-stop(0, #4d4d4d),color-stop(0.4, #4d4d4d),color-stop(0.5, white),color-stop(0.6, #4d4d4d),color-stop(1, #4d4d4d));
+
   -moz-background-clip: text;
   -webkit-background-clip: text;
-  
+
   -moz-text-fill-color: transparent;
   -webkit-text-fill-color: transparent;
-  
+
   -webkit-animation: eva-slidetounlock 5s linear infinite;
   animation: eva-slidetounlock 5s linear infinite;
-  
+
   font-size: 76px;
   font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
   font-weight: 300;
-  
+
   padding: 0;
   width: 100%;
   margin: 0;

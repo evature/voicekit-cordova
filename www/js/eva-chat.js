@@ -818,7 +818,9 @@ module.exports = {
 			eva.addEvaChat(eva.INITIAL_PROMPT);
 		}
 		$('#eva-cover').show();
-		speechSynthesis.cancel();
+
+		//speechSynthesis.cancel();
+    eva.speak('', true);
 		$('.eva-record_button').addClass('eva-is_recording');
 		var meChat = null;
 		navigator.speechrecognizer.recognize(
@@ -898,7 +900,8 @@ module.exports = {
 		}
 
 		if ($('#eva-cover').is(":visible")) {
-			speechSynthesis.cancel();
+			//speechSynthesis.cancel();
+      eva.speak('', true);
 			$('#eva-cover').fadeOut(function() {
 				//eva.resetSession(true);
 				$('#eva-cover').hide();
